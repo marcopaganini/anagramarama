@@ -7,10 +7,11 @@
 // A few possible improvements:
 //
 // 1) How to make it more efficient in general? Where is time being consumed?
-// 2) How can we make subtract() faster?
+// 2) How can we make subtract() faster? Do we need it at all?
 // 3) anagram() can be optimized.
 // 4) Make the program UTF-8 safe.
 // 5) Speed up loading by saving a ready made version of wordLetters.
+// 6) Can we make permutate better?
 //
 // Also, it's quite possible many bug exist.
 //
@@ -74,14 +75,22 @@ func subtract(a, b string) string {
 }
 
 // permutate returns all possible permutations of a single string.
-func permutate(prev, s string, res []string) []string {
+func permutate(prev, original, s string, res []string) []string {
 	ret := res
-	//fmt.Printf("[%s] [%s] At entry [%s] [%s]\n", prev, s, res, ret)
 
-	if len(s) != 0 {
+	// fmt.Printf("prev=%q, string=%q, slice=%q\n", prev, s, res)
+
+	// We don't need to repeat the word from the second letter, since
+	// we'll always try the difference later in anawords(). Terminate
+	// the recursion if we're past the first letter of the original word.
+	if prev != "" && prev[0] != original[0] {
+		return ret
+	}
+
+	if s != "" {
 		for pos := 0; pos < len(s); pos++ {
 			sofar := prev + string(s[pos])
-			ret = permutate(sofar, s[pos+1:], ret)
+			ret = permutate(sofar, original, s[pos+1:], ret)
 			ret = append(ret, sofar)
 		}
 	}
@@ -105,15 +114,20 @@ func readDict(r io.Reader) (wordLetters, error) {
 	return words, nil
 }
 
-// anagram recursively generates anagrams from the passed string and returns
+// anagram returns a list of anagram expressions for the input string.
+func anagram(wl wordLetters, word string) []string {
+	return anawords(wl, word, word, []string{})
+}
+
+// anawords recursively generates anagrams from the passed string and returns
 // a slice of anagrams.
-func anagram(wl wordLetters, word string, prevwords []string) []string {
+func anawords(wl wordLetters, original, word string, prevwords []string) []string {
 	retwords := prevwords
-	combos := permutate("", word, []string{})
+	combos := permutate("", original, word, []string{})
 
 	for _, combo := range combos {
 		// Valid dictionary word?
-		anawords, ok := wl[combo]
+		awords, ok := wl[combo]
 		if !ok {
 			continue
 		}
@@ -122,19 +136,19 @@ func anagram(wl wordLetters, word string, prevwords []string) []string {
 		rem := subtract(word, combo)
 
 		// If nothing further to recurse, return.
-		if len(rem) == 0 {
-			for _, a := range anawords {
+		if rem == "" {
+			for _, a := range awords {
 				retwords = append(retwords, a)
 			}
 			continue
 		}
-		ret := anagram(wl, rem, []string{})
+		ret := anawords(wl, original, rem, []string{})
 
 		// Append a all found combinations to the main slice.
 		if len(ret) > 0 {
-			found := make([]string, len(anawords)*len(ret))
+			found := make([]string, len(awords)*len(ret))
 			ix := 0
-			for _, a := range anawords {
+			for _, a := range awords {
 				for _, w := range ret {
 					found[ix] = a + " " + w
 					ix++

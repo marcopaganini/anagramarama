@@ -41,6 +41,14 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	/*word := flag.Args()[0]
+	ret := permutate("", word, word, []string{})
+	for _, x := range ret {
+		fmt.Printf("%q\n", x)
+	}
+	os.Exit(1)
+	*/
+
 	file, err := os.Open(optDict)
 	if err != nil {
 		log.Fatalln(err)
@@ -52,7 +60,7 @@ func main() {
 
 	word := sortedString(flag.Args()[0], map[rune]bool{})
 
-	res := anagram(wlist, word, []string{})
+	res := anagram(wlist, word)
 	for _, s := range res {
 		fmt.Println(s)
 	}
