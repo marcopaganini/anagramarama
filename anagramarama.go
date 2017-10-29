@@ -97,7 +97,7 @@ func readDict(r io.Reader) (wordLetters, error) {
 
 	for scanner.Scan() {
 		word := strings.ToLower(scanner.Text())
-		addUniqueWord(words, sortedString(word, map[rune]bool{'\'': true}), word)
+		addUniqueWord(words, sortedString(word, map[rune]bool{'\'': true, ' ': true}), word)
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err
