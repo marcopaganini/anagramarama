@@ -10,21 +10,25 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"runtime/pprof"
+	"strings"
 )
 
 func main() {
 	var (
 		optDict       string
 		optCPUProfile string
+		optSilent     bool
 	)
 
 	log.SetFlags(0)
 
-	flag.StringVar(&optDict, "dict", "/usr/share/dict/words", "dictionary file")
+	flag.StringVar(&optDict, "dict", "/usr/share/games/wordplay/words721.txt", "dictionary file")
 	flag.StringVar(&optCPUProfile, "cpuprofile", "", "write cpu profile to file")
+	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -41,27 +45,19 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	/*word := flag.Args()[0]
-	ret := permutate("", word, word, []string{})
-	for _, x := range ret {
-		fmt.Printf("%q\n", x)
-	}
-	os.Exit(1)
-	*/
-
-	file, err := os.Open(optDict)
+	buf, err := ioutil.ReadFile(optDict)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	wlist, err := readDict(file)
-	if err != nil {
-		log.Fatalln(err)
-	}
+	phrase := strings.ToUpper(flag.Args()[0])
+	words := strings.Split(strings.TrimRight(string(buf), "\n"), "\n")
+	cand := candidates(words, phrase)
 
-	word := sortedString(flag.Args()[0], map[rune]bool{})
+	an := anagrams(phrase, cand)
 
-	res := anagram(wlist, word)
-	for _, s := range res {
-		fmt.Println(s)
+	if !optSilent {
+		for _, w := range an {
+			fmt.Println(w)
+		}
 	}
 }

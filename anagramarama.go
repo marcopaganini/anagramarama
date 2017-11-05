@@ -1,19 +1,4 @@
-// anagramarama - A simple anagram generator in Go.
-//
-// This is a simple (and inefficient) anagram generator in Go. Its main purpose
-// is not to provide a platform for people learning recursive algorithms and
-// efficiency tweaks in Go.
-//
-// A few possible improvements:
-//
-// 1) How to make it more efficient in general? Where is time being consumed?
-// 2) How can we make subtract() faster? Do we need it at all?
-// 3) anagram() can be optimized.
-// 4) Make the program UTF-8 safe.
-// 5) Speed up loading by saving a ready made version of wordLetters.
-// 6) Can we make permutate better?
-//
-// Also, it's quite possible many bug exist.
+// This file is part of anagramarama - A simple anagram generator in Go.
 //
 // (C) Oct/2017 by Marco Paganini <paganini@paganini.net>
 //
@@ -23,139 +8,194 @@
 package main
 
 import (
-	"bufio"
-	"io"
-	"sort"
 	"strings"
 )
 
-// wordLetters maps a string with the sorted letters of a word to
-// the list of words containing exactly those letters.
-type wordLetters map[string][]string
+const (
+	frequencyMapLen = 26 // Uppercase letters
+)
 
-// sortedString returns the input string with the letters sorted.
-func sortedString(s string, filter map[rune]bool) string {
-	letters := []string{}
-	for _, r := range s {
-		if _, ok := filter[r]; !ok {
-			letters = append(letters, string(r))
+type frequencyMap []int
+
+// candidates reads a slice of words and produces a list of candidate words.
+// All words are converted to uppercase when read. Words containing non-letter
+// characters are silently ignored.
+func candidates(words []string, phrase string) []string {
+	cand := []string{}
+
+	pmap := freqmap(phrase)
+	plen := nonSpaceLen(phrase)
+
+wordLoop:
+	for _, w := range words {
+		// Next word immediately if word is larger than phrase.
+		if len(w) > plen {
+			continue
 		}
-	}
-	sort.Strings(letters)
-	return strings.Join(letters, "")
-}
-
-// addUniqueWord adds a new word to the slice of sortedLetters,
-// avoiding duplicates.
-func addUniqueWord(words wordLetters, sortedLetters, word string) {
-	_, ok := words[sortedLetters]
-	if !ok {
-		words[sortedLetters] = []string{}
-	}
-	// Ignore duplicate words.
-	for _, w := range words[sortedLetters] {
-		if w == word {
-			return
-		}
-	}
-	words[sortedLetters] = append(words[sortedLetters], word)
-}
-
-// subtract returns a string containing the letters in the first argument
-// minus the letters on the second argument.
-func subtract(a, b string) string {
-	for ixb := 0; ixb < len(b); ixb++ {
-		for ixa := 0; ixa < len(a); ixa++ {
-			if a[ixa] == b[ixb] {
-				a = a[0:ixa] + a[ixa+1:]
+		w := strings.ToUpper(w)
+		for _, r := range w {
+			if r < 'A' || r > 'Z' {
+				continue wordLoop
 			}
 		}
+		if mapContains(pmap, w) {
+			cand = append(cand, w)
+		}
 	}
-	return a
+
+	return cand
 }
 
-// permutate returns all possible permutations of a single string.
-func permutate(prev, original, s string, res []string) []string {
-	ret := res
-
-	// fmt.Printf("prev=%q, string=%q, slice=%q\n", prev, s, res)
-
-	// We don't need to repeat the word from the second letter, since
-	// we'll always try the difference later in anawords(). Terminate
-	// the recursion if we're past the first letter of the original word.
-	if prev != "" && prev[0] != original[0] {
-		return ret
-	}
-
-	if s != "" {
-		for pos := 0; pos < len(s); pos++ {
-			sofar := prev + string(s[pos])
-			ret = permutate(sofar, original, s[pos+1:], ret)
-			ret = append(ret, sofar)
+// freqmap creates a frequency map of every letter in the word. Assumes only
+// uppercase letters as input and uses a slice instead of maps for performance
+// reasons.
+func freqmap(str ...string) frequencyMap {
+	ret := make(frequencyMap, frequencyMapLen)
+	for _, s := range str {
+		for _, r := range s {
+			idx := int(r) - int('A')
+			if idx < 0 || idx > 25 {
+				continue
+			}
+			ret[int(r)-int('A')]++
 		}
 	}
 	return ret
 }
 
-// readDict reads a text fiel containing one word per line into wordLetters.
-// Each word is saved in a map keyed by a sorted string containing all letters
-// in that word.
-func readDict(r io.Reader) (wordLetters, error) {
-	words := wordLetters{}
-	scanner := bufio.NewScanner(r)
+// mapContains returns true if a string is fully contained in a frequency map.
+func mapContains(a frequencyMap, str ...string) bool {
+	acopy := make(frequencyMap, frequencyMapLen)
+	copy(acopy, a)
 
-	for scanner.Scan() {
-		word := strings.ToLower(scanner.Text())
-		addUniqueWord(words, sortedString(word, map[rune]bool{'\'': true, ' ': true}), word)
+	//fmt.Printf("==== DEBUG ====\nmapcontains string slice: %q\n", str)
+
+	for _, s := range str {
+		//fmt.Printf("DEBUG: mapcontains string %q\n%q\n", s, acopy)
+		for _, r := range s {
+			idx := int(r) - int('A')
+			if idx < 0 || idx > 25 {
+				continue
+			}
+			if acopy[idx] == 0 {
+				//fmt.Printf("DEBUG: idx=%d, count=%d, returning false\n", idx, acopy[idx])
+				return false
+			}
+			acopy[idx]--
+		}
 	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	return words, nil
+	//fmt.Printf("DEBUG: mapcontains returning true\n")
+	return true
 }
 
-// anagram returns a list of anagram expressions for the input string.
-func anagram(wl wordLetters, word string) []string {
-	return anawords(wl, word, word, []string{})
-}
-
-// anawords recursively generates anagrams from the passed string and returns
-// a slice of anagrams.
-func anawords(wl wordLetters, original, word string, prevwords []string) []string {
-	retwords := prevwords
-	combos := permutate("", original, word, []string{})
-
-	for _, combo := range combos {
-		// Valid dictionary word?
-		awords, ok := wl[combo]
-		if !ok {
-			continue
-		}
-
-		// Remaining letters in our word minus combo.
-		rem := subtract(word, combo)
-
-		// If nothing further to recurse, return.
-		if rem == "" {
-			for _, a := range awords {
-				retwords = append(retwords, a)
-			}
-			continue
-		}
-		ret := anawords(wl, original, rem, []string{})
-
-		// Append a all found combinations to the main slice.
-		if len(ret) > 0 {
-			found := make([]string, len(awords)*len(ret))
-			ix := 0
-			for _, a := range awords {
-				for _, w := range ret {
-					found[ix] = a + " " + w
-					ix++
-				}
-			}
-			retwords = append(retwords, found...)
+// mapEquals returns true if two frequency maps are identical.
+func mapEquals(a, b frequencyMap) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for ix := 0; ix < frequencyMapLen; ix++ {
+		if a[ix] != b[ix] {
+			return false
 		}
 	}
-	return retwords
+	return true
+}
+
+// anagrams starts the recursive anagramming function for each word in the list
+// of candidate words.
+func anagrams(phrase string, cand []string) []string {
+	ret := []string{}
+	pmap := freqmap(phrase)
+	plen := nonSpaceLen(phrase)
+
+	// Immediately print candidates that match the len of phrase and remove them
+	// from the slice, since they're anagrams by definition.
+	for ix, w := range cand {
+		if len(w) == plen {
+			ret = append(ret, w)
+			cand[ix] = ""
+		}
+	}
+
+	for ix, w := range cand {
+		if w == "" {
+			continue
+		}
+		//fmt.Printf("Anagrams trying with base=%q\n", cand[ix])
+		r := anawords(pmap, plen, cand[ix+1:], []string{cand[ix]})
+		if len(r) > 0 {
+			ret = append(ret, r...)
+		}
+	}
+	return ret
+}
+
+// noSpaceLen returns the length of the string ignoring spaces.
+func nonSpaceLen(s string) int {
+	c := 0
+	for _, r := range s {
+		if r != ' ' {
+			c++
+		}
+	}
+	return c
+}
+
+// anawords recursively generates a list of anagrams for the specified list of
+// candidates, starting with 'base' as the root.
+func anawords(pmap frequencyMap, plen int, cand []string, base []string) []string {
+	blen := 0
+	for _, w := range base {
+		blen += len(w)
+	}
+	//fmt.Printf("DEBUG: base=%q, blen=%d, plen=%d\n", base, blen, plen)
+	//fmt.Printf("DEBUG: cand=%q\n", cand)
+
+	// If current base is longer than phrase, skip.
+	if blen > plen {
+		//fmt.Println("DEBUG: Base too long:", base)
+		return []string{}
+	}
+
+	ret := []string{}
+
+	// Our base phrase is still shorter than the phrase. We continue if our
+	// base is still a candidate word of phrase.
+	if blen < plen {
+		if !mapContains(pmap, base...) {
+			//fmt.Printf("DEBUG: Map does not contain base: %q\n", base)
+			return []string{}
+		}
+		// Recurse with each word on the list of candidates and our base.
+		for ix, cword := range cand {
+			// Ignore removed (blank) words.
+			if cword == "" {
+				continue
+			}
+			// Optimization: skip the next base (base + current candidate word)
+			// if we detect it's larger than the original phrase.
+			if blen+len(cword) > plen {
+				//fmt.Printf("DEBUG: skipping since base is too large: blen=%d, cwordlen=%d, cword=%q\n", blen, len(cword), cword)
+				continue
+			}
+			newbase := append(base, cword)
+			r := anawords(pmap, plen, cand[ix+1:], newbase)
+			if len(r) > 0 {
+				//fmt.Printf("DEBUG: Appending %q to the list of anagrams\n", r)
+				ret = append(ret, r...)
+			}
+		}
+		//fmt.Printf("DEBUG: Returning %q now\n", ret)
+		return ret
+	}
+
+	// Need an exact match here.
+	//fmt.Println("DEBUG: Need an exact match for", base)
+	bmap := freqmap(base...)
+	if !mapEquals(pmap, bmap) {
+		//fmt.Println("DEBUG: no exact match for", base)
+		return []string{}
+	}
+	//fmt.Printf("DEBUG: Yay got match %q\n", base)
+	return []string{strings.Join(base, " ")}
 }
