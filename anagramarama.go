@@ -8,6 +8,7 @@
 package main
 
 import (
+	"sort"
 	"strings"
 )
 
@@ -16,6 +17,22 @@ const (
 )
 
 type frequencyMap []int
+
+type byLen []string
+
+func (x byLen) Len() int {
+	return len(x)
+}
+
+func (x byLen) Swap(i, j int) {
+	x[i], x[j] = x[j], x[i]
+}
+
+func (x byLen) Less(i, j int) bool {
+	leni := len(x[i])
+	lenj := len(x[j])
+	return leni < lenj
+}
 
 // candidates reads a slice of words and produces a list of candidate words.
 // All words are converted to uppercase when read. Words containing non-letter
@@ -43,6 +60,7 @@ wordLoop:
 		}
 	}
 
+	sort.Sort(byLen(cand))
 	return cand
 }
 
@@ -172,11 +190,13 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string) []strin
 			if cword == "" {
 				continue
 			}
-			// Optimization: skip the next base (base + current candidate word)
-			// if we detect it's larger than the original phrase.
+			// Optimization: the input list of words is sorted by word length.
+			// If we the length of the current base + the current word exceeds
+			// the total length of the phrase, we can return immediately, since
+			// all further executions will be invalid.
 			if blen+len(cword) > plen {
 				//fmt.Printf("DEBUG: skipping since base is too large: blen=%d, cwordlen=%d, cword=%q\n", blen, len(cword), cword)
-				continue
+				break
 			}
 			newbase := append(base, cword)
 			r := anawords(pmap, plen, cand[ix+1:], newbase)

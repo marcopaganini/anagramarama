@@ -22,6 +22,7 @@ func main() {
 		optDict       string
 		optCPUProfile string
 		optSilent     bool
+		optCandidates bool
 	)
 
 	log.SetFlags(0)
@@ -29,6 +30,7 @@ func main() {
 	flag.StringVar(&optDict, "dict", "/usr/share/games/wordplay/words721.txt", "dictionary file")
 	flag.StringVar(&optCPUProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
+	flag.BoolVar(&optCandidates, "candidates", false, "just show candidate words (don't anagram)")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -52,6 +54,13 @@ func main() {
 	phrase := strings.ToUpper(flag.Args()[0])
 	words := strings.Split(strings.TrimRight(string(buf), "\n"), "\n")
 	cand := candidates(words, phrase)
+
+	if optCandidates {
+		for _, w := range cand {
+			fmt.Println(w)
+		}
+		os.Exit(0)
+	}
 
 	an := anagrams(phrase, cand)
 
