@@ -40,7 +40,8 @@ func (x byLen) Less(i, j int) bool {
 func candidates(words []string, phrase string) []string {
 	cand := []string{}
 
-	pmap := freqmap(phrase)
+	pmap := make(frequencyMap, frequencyMapLen)
+	freqmap(pmap, phrase)
 	plen := nonSpaceLen(phrase)
 
 wordLoop:
@@ -67,18 +68,16 @@ wordLoop:
 // freqmap creates a frequency map of every letter in the word. Assumes only
 // uppercase letters as input and uses a slice instead of maps for performance
 // reasons.
-func freqmap(str ...string) frequencyMap {
-	ret := make(frequencyMap, frequencyMapLen)
+func freqmap(fm frequencyMap, str ...string) {
 	for _, s := range str {
 		for _, r := range s {
 			idx := int(r) - int('A')
 			if idx < 0 || idx > 25 {
 				continue
 			}
-			ret[int(r)-int('A')]++
+			fm[int(r)-int('A')]++
 		}
 	}
-	return ret
 }
 
 // mapContains returns true if a string is fully contained in a frequency map.
@@ -123,7 +122,8 @@ func mapEquals(a, b frequencyMap) bool {
 // of candidate words.
 func anagrams(phrase string, cand []string) []string {
 	ret := []string{}
-	pmap := freqmap(phrase)
+	pmap := make(frequencyMap, frequencyMapLen)
+	freqmap(pmap, phrase)
 	plen := nonSpaceLen(phrase)
 
 	// Immediately print candidates that match the len of phrase and remove them
@@ -211,7 +211,8 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string) []strin
 
 	// Need an exact match here.
 	//fmt.Println("DEBUG: Need an exact match for", base)
-	bmap := freqmap(base...)
+	bmap := make(frequencyMap, frequencyMapLen)
+	freqmap(bmap, base...)
 	if !mapEquals(pmap, bmap) {
 		//fmt.Println("DEBUG: no exact match for", base)
 		return []string{}
