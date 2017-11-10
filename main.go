@@ -27,7 +27,7 @@ func main() {
 
 	log.SetFlags(0)
 
-	flag.StringVar(&optDict, "dict", "/usr/share/games/wordplay/words721.txt", "dictionary file")
+	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
 	flag.StringVar(&optCPUProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
 	flag.BoolVar(&optCandidates, "candidates", false, "just show candidate words (don't anagram)")
@@ -51,7 +51,15 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	phrase := strings.ToUpper(flag.Args()[0])
+
+	// Convert expression to uppercase
+	// FIXME: Optimize this.
+	phrase := ""
+	for _, c := range strings.ToUpper(flag.Args()[0]) {
+		if c >= 'A' && c <= 'Z' {
+			phrase = phrase + string(c)
+		}
+	}
 	words := strings.Split(strings.TrimRight(string(buf), "\n"), "\n")
 	cand := candidates(words, phrase)
 

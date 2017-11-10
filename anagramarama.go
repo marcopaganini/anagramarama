@@ -16,7 +16,7 @@ const (
 	frequencyMapLen = 26 // Uppercase letters
 )
 
-type frequencyMap []int
+type frequencyMap []byte
 
 type byLen []string
 
@@ -72,10 +72,7 @@ func freqmap(fm frequencyMap, str ...string) {
 	for _, s := range str {
 		for _, r := range s {
 			idx := int(r) - int('A')
-			if idx < 0 || idx > 25 {
-				continue
-			}
-			fm[int(r)-int('A')]++
+			fm[idx]++
 		}
 	}
 }
