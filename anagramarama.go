@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	frequencyMapLen = 26 // Uppercase letters
+	frequencyMapLen = 26    // Uppercase letters.
+	anagramCapacity = 30000 // Initial capacity of the slice to hold anagrams.
 )
 
 type frequencyMap []byte
@@ -118,7 +119,7 @@ func mapEquals(a, b frequencyMap) bool {
 // anagrams starts the recursive anagramming function for each word in the list
 // of candidate words.
 func anagrams(phrase string, cand []string) []string {
-	ret := []string{}
+	ret := make([]string, 0, anagramCapacity)
 	pmap := make(frequencyMap, frequencyMapLen)
 	freqmap(pmap, phrase)
 	plen := nonSpaceLen(phrase)
