@@ -13,9 +13,20 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
 	"runtime/pprof"
 	"strings"
 )
+
+// Sanitize converts the input string to uppercase and removes all characters
+// that don't match [A-Z].
+func sanitize(s string) (string, error) {
+	re, err := regexp.Compile("[^A-Z]")
+	if err != nil {
+		return "", err
+	}
+	return re.ReplaceAllString(strings.ToUpper(s), ""), nil
+}
 
 func main() {
 	var (
@@ -54,12 +65,11 @@ func main() {
 
 	// Convert expression to uppercase
 	// FIXME: Optimize this.
-	phrase := ""
-	for _, c := range strings.ToUpper(flag.Args()[0]) {
-		if c >= 'A' && c <= 'Z' {
-			phrase = phrase + string(c)
-		}
+	phrase, err := sanitize(flag.Args()[0])
+	if err != nil {
+		log.Fatalln(err)
 	}
+
 	words := strings.Split(strings.TrimRight(string(buf), "\n"), "\n")
 	cand := candidates(words, phrase)
 
