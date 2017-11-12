@@ -34,7 +34,7 @@ func candidates(words []string, phrase string) ([]string, alternativeWords) {
 
 	pmap := make(frequencyMap, frequencyMapLen)
 	freqmap(pmap, phrase)
-	plen := nonSpaceLen(phrase)
+	plen := len(phrase)
 
 wordLoop:
 	for _, w := range words {
@@ -119,21 +119,18 @@ func anagrams(phrase string, cand []string, altwords alternativeWords) []string 
 	// Pre-calculate frequency map and length of phrase, since it does not change.
 	pmap := make(frequencyMap, frequencyMapLen)
 	freqmap(pmap, phrase)
-	plen := nonSpaceLen(phrase)
-
-	// Immediately print candidates that match the len of phrase and remove them
-	// from the slice, since they're anagrams by definition.
-	for ix, w := range cand {
-		if len(w) == plen {
-			r := multiReplace([]string{w}, altwords)
-			ret = append(ret, r...)
-			cand[ix] = ""
-		}
-	}
+	plen := len(phrase)
 
 	for ix, w := range cand {
 		if w == "" {
 			continue
+		}
+		// Immediately print candidates that match the len of phrase and remove them
+		// from the slice, since they're anagrams by definition.
+		if len(w) == plen {
+			r := multiReplace([]string{w}, altwords)
+			ret = append(ret, r...)
+			cand[ix] = ""
 		}
 		//fmt.Printf("Anagrams trying with base=%q\n", cand[ix])
 		r := anawords(pmap, plen, cand[ix+1:], []string{cand[ix]}, altwords)
@@ -142,17 +139,6 @@ func anagrams(phrase string, cand []string, altwords alternativeWords) []string 
 		}
 	}
 	return ret
-}
-
-// noSpaceLen returns the length of the string ignoring spaces.
-func nonSpaceLen(s string) int {
-	c := 0
-	for _, r := range s {
-		if r != ' ' {
-			c++
-		}
-	}
-	return c
 }
 
 // anawords recursively generates a list of anagrams for the specified list of
