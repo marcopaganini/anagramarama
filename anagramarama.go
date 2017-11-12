@@ -8,6 +8,7 @@
 package main
 
 import (
+	//"fmt"
 	"sort"
 	"strings"
 )
@@ -17,9 +18,11 @@ const (
 	anagramCapacity = 30000 // Initial capacity of the slice to hold anagrams.
 )
 
-type frequencyMap []byte
-
-type byLen []string
+type (
+	frequencyMap     []byte
+	alternativeWords map[string][]string
+	byLen            []string
+)
 
 func (x byLen) Len() int {
 	return len(x)
@@ -35,11 +38,33 @@ func (x byLen) Less(i, j int) bool {
 	return leni < lenj
 }
 
-// candidates reads a slice of words and produces a list of candidate words.
-// All words are converted to uppercase when read. Words containing non-letter
-// characters are silently ignored.
-func candidates(words []string, phrase string) []string {
+type sortRunes []rune
+
+func (s sortRunes) Less(i, j int) bool {
+	return s[i] < s[j]
+}
+
+func (s sortRunes) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sortRunes) Len() int {
+	return len(s)
+}
+
+func sortString(s string) string {
+	r := []rune(s)
+	sort.Sort(sortRunes(r))
+	return string(r)
+}
+
+// candidates reads a slice of words and produces a list of candidate and
+// alternative words.  A candidate word is a word fully contained in the
+// original phrase. Alternative words contain a slice of anagrams from the
+// candidate word, keyed by the sorted characters of the word.
+func candidates(words []string, phrase string) ([]string, alternativeWords) {
 	cand := []string{}
+	altwords := alternativeWords{}
 
 	pmap := make(frequencyMap, frequencyMapLen)
 	freqmap(pmap, phrase)
@@ -51,6 +76,7 @@ wordLoop:
 		if len(w) > plen {
 			continue
 		}
+		// Ignore anything not in [A-Z].
 		w := strings.ToUpper(w)
 		for _, r := range w {
 			if r < 'A' || r > 'Z' {
@@ -58,12 +84,18 @@ wordLoop:
 			}
 		}
 		if mapContains(pmap, w) {
-			cand = append(cand, w)
+			sortword := sortString(w)
+			if _, ok := altwords[sortword]; ok {
+				altwords[sortword] = append(altwords[sortword], w)
+			} else {
+				altwords[sortword] = []string{w}
+				cand = append(cand, w)
+			}
 		}
 	}
 
 	sort.Sort(byLen(cand))
-	return cand
+	return cand, altwords
 }
 
 // freqmap creates a frequency map of every letter in the word. Assumes only
@@ -118,8 +150,10 @@ func mapEquals(a, b frequencyMap) bool {
 
 // anagrams starts the recursive anagramming function for each word in the list
 // of candidate words.
-func anagrams(phrase string, cand []string) []string {
+func anagrams(phrase string, cand []string, altwords alternativeWords) []string {
 	ret := make([]string, 0, anagramCapacity)
+
+	// Pre-calculate frequency map and length of phrase, since it does not change.
 	pmap := make(frequencyMap, frequencyMapLen)
 	freqmap(pmap, phrase)
 	plen := nonSpaceLen(phrase)
@@ -128,7 +162,8 @@ func anagrams(phrase string, cand []string) []string {
 	// from the slice, since they're anagrams by definition.
 	for ix, w := range cand {
 		if len(w) == plen {
-			ret = append(ret, w)
+			r := multiReplace([]string{w}, altwords)
+			ret = append(ret, r...)
 			cand[ix] = ""
 		}
 	}
@@ -138,7 +173,7 @@ func anagrams(phrase string, cand []string) []string {
 			continue
 		}
 		//fmt.Printf("Anagrams trying with base=%q\n", cand[ix])
-		r := anawords(pmap, plen, cand[ix+1:], []string{cand[ix]})
+		r := anawords(pmap, plen, cand[ix+1:], []string{cand[ix]}, altwords)
 		if len(r) > 0 {
 			ret = append(ret, r...)
 		}
@@ -159,7 +194,7 @@ func nonSpaceLen(s string) int {
 
 // anawords recursively generates a list of anagrams for the specified list of
 // candidates, starting with 'base' as the root.
-func anawords(pmap frequencyMap, plen int, cand []string, base []string) []string {
+func anawords(pmap frequencyMap, plen int, cand []string, base []string, altwords alternativeWords) []string {
 	blen := 0
 	for _, w := range base {
 		blen += len(w)
@@ -197,7 +232,9 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string) []strin
 				break
 			}
 			newbase := append(base, cword)
-			r := anawords(pmap, plen, cand[ix+1:], newbase)
+
+			r := anawords(pmap, plen, cand[ix+1:], newbase, altwords)
+
 			if len(r) > 0 {
 				//fmt.Printf("DEBUG: Appending %q to the list of anagrams\n", r)
 				ret = append(ret, r...)
@@ -207,14 +244,62 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string) []strin
 		return ret
 	}
 
-	// Need an exact match here.
-	//fmt.Println("DEBUG: Need an exact match for", base)
+	// The length of the base string is the same as the phrase. If we have
+	// an exact match then we have an anagram.
 	bmap := make(frequencyMap, frequencyMapLen)
 	freqmap(bmap, base...)
 	if !mapEquals(pmap, bmap) {
 		//fmt.Println("DEBUG: no exact match for", base)
 		return []string{}
 	}
-	//fmt.Printf("DEBUG: Yay got match %q\n", base)
-	return []string{strings.Join(base, " ")}
+	ret = multiReplace(base, altwords)
+	//fmt.Printf("Returning exact match: %q\n", ret)
+	return ret
+}
+
+func multiReplace(base []string, altwords alternativeWords) []string {
+	// Lines is a slice of slices. First level is a line. Second
+	// level is a slice of words.
+	lines := make([][]string, 1, 10)
+	lines[0] = base
+
+	// Iterate over each word on base>
+	for wordpos := range base {
+		//fmt.Printf("wordpos = %d\n", wordpos)
+		// Iterate over each line.
+		numlines := len(lines)
+		for ixline := 0; ixline < numlines; ixline++ {
+			line := lines[ixline]
+			//fmt.Printf("Line is %q\n", line)
+			word := line[wordpos]
+			//fmt.Printf("Word is %q\n", word)
+			aws := altwords[sortString(word)]
+			//fmt.Printf("Alternative words: %q\n", aws)
+			// Iterate over each alternate word and append variations to
+			// the original slice at the 'idx' position. The cycle then
+			// repeats for the new slice, starting at the next word.
+			for _, aw := range aws {
+				//fmt.Printf("Alternate word is: %q\n", aw)
+				if aw == word {
+					//fmt.Printf("Ignoring...\n")
+					continue
+				}
+				newline := make([]string, len(line))
+				for i := range line {
+					newline[i] = line[i]
+				}
+				newline[wordpos] = aw
+				//fmt.Printf("Adding %q to lines\n", newline)
+				lines = append(lines, newline)
+			}
+		}
+	}
+
+	// Convert [][]string into a []string with each word separated by spaces.
+	ret := []string{}
+	for _, line := range lines {
+		ret = append(ret, strings.Join(line, " "))
+	}
+	//fmt.Printf("Replaced to %q\n", ret)
+	return ret
 }

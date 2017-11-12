@@ -63,15 +63,19 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	// Convert expression to uppercase
-	// FIXME: Optimize this.
 	phrase, err := sanitize(flag.Args()[0])
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	words := strings.Split(strings.TrimRight(string(buf), "\n"), "\n")
-	cand := candidates(words, phrase)
+	cand, altwords := candidates(words, phrase)
+
+	/*
+		for k, v := range altwords {
+			fmt.Printf("%q: %s\n", k, strings.Join(v, ","))
+		}
+	*/
 
 	if optCandidates {
 		for _, w := range cand {
@@ -80,7 +84,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	an := anagrams(phrase, cand)
+	an := anagrams(phrase, cand, altwords)
 
 	if !optSilent {
 		for _, w := range an {
