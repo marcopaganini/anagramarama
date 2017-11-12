@@ -112,34 +112,31 @@ func freqmap(fm frequencyMap, str ...string) {
 
 // mapContains returns true if a string is fully contained in a frequency map.
 func mapContains(a frequencyMap, str ...string) bool {
-	acopy := make(frequencyMap, frequencyMapLen)
-	copy(acopy, a)
+	overlay := frequencyMap{
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
 
-	//fmt.Printf("==== DEBUG ====\nmapcontains string slice: %q\n", str)
-
+	ret := true
 	for _, s := range str {
-		//fmt.Printf("DEBUG: mapcontains string %q\n%q\n", s, acopy)
 		for _, r := range s {
 			idx := int(r) - int('A')
-			if idx < 0 || idx > 25 {
-				continue
+			if overlay[idx] == 0xff {
+				overlay[idx] = a[idx]
 			}
-			if acopy[idx] == 0 {
-				//fmt.Printf("DEBUG: idx=%d, count=%d, returning false\n", idx, acopy[idx])
-				return false
+			if overlay[idx] == 0 {
+				ret = false
+				break
 			}
-			acopy[idx]--
+			overlay[idx]--
 		}
 	}
-	//fmt.Printf("DEBUG: mapcontains returning true\n")
-	return true
+	return ret
 }
 
 // mapEquals returns true if two frequency maps are identical.
 func mapEquals(a, b frequencyMap) bool {
-	if len(a) != len(b) {
-		return false
-	}
 	for ix := 0; ix < frequencyMapLen; ix++ {
 		if a[ix] != b[ix] {
 			return false
