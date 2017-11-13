@@ -12,6 +12,15 @@ import (
 	"sort"
 )
 
+type (
+	// byLen defines a type to sort a slice of strings by
+	// the length of each element.
+	byLen []string
+
+	// sortRunes defines a type to short the runes of a string.
+	sortRunes []rune
+)
+
 func (x byLen) Len() int {
 	return len(x)
 }
@@ -25,8 +34,6 @@ func (x byLen) Less(i, j int) bool {
 	lenj := len(x[j])
 	return leni < lenj
 }
-
-type sortRunes []rune
 
 func (s sortRunes) Less(i, j int) bool {
 	return s[i] < s[j]

@@ -42,12 +42,20 @@ func main() {
 	flag.BoolVar(&optCandidates, "candidates", false, "just show candidate words (don't anagram)")
 	flag.StringVar(&optCPUProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
-	flag.IntVar(&optParallel, "parallelism", 1, "number of goroutine threads")
+	flag.IntVar(&optParallel, "parallelism", 16, "number of goroutine threads")
 	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
+
+	// Custom usage.
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Use: %s [flags] expression_to_anagram\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		flag.PrintDefaults()
+	}
+
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
-		fmt.Println("Use: anagramarama word")
+		flag.Usage()
 		os.Exit(2)
 	}
 	// Profiling
@@ -60,6 +68,7 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
+	// Read entire file in memory.
 	buf, err := ioutil.ReadFile(optDict)
 	if err != nil {
 		log.Fatalln(err)
@@ -70,14 +79,9 @@ func main() {
 		log.Fatalln(err)
 	}
 
+	// Split input in newlines and generate the list of candidate words.
 	words := strings.Split(strings.TrimRight(string(buf), "\n"), "\n")
 	cand, altwords := candidates(words, phrase)
-
-	/*
-		for k, v := range altwords {
-			fmt.Printf("%q: %s\n", k, strings.Join(v, ","))
-		}
-	*/
 
 	if optCandidates {
 		for _, w := range cand {
@@ -86,6 +90,7 @@ func main() {
 		os.Exit(0)
 	}
 
+	// Anagram.
 	an := anagrams(phrase, cand, altwords, optParallel)
 
 	if !optSilent {

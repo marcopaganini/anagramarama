@@ -14,13 +14,15 @@ import (
 
 const (
 	frequencyMapLen = 26 // Uppercase letters.
-	anagramCapacity = 16 // Initial capacity of the slice to hold anagrams.
 )
 
 type (
-	frequencyMap     []byte
+	// frequencyMap holds a letter to frequency map. Only 'frequencyMapLen'
+	// characters are supported.
+	frequencyMap []byte
+
+	// alternativeWords holds the list of alternatives for one candidate word.
 	alternativeWords map[string][]string
-	byLen            []string
 
 	// workerRequest contains all the necessary information to start
 	// a tree of anagrams (initial call to anawords).
@@ -36,7 +38,7 @@ type (
 // candidates reads a slice of words and produces a list of candidate and
 // alternative words.  A candidate word is a word fully contained in the
 // original phrase. Alternative words contain a slice of anagrams from the
-// candidate word, keyed by the sorted characters of the word.
+// candidate word, keyed by the sorted characters of the candidate word.
 func candidates(words []string, phrase string) ([]string, alternativeWords) {
 	cand := []string{}
 	altwords := alternativeWords{}
@@ -73,7 +75,7 @@ wordLoop:
 	return cand, altwords
 }
 
-// freqmap creates a frequency map of every letter in the word. Assumes only
+// freqmap creates a frequency map of every letter in the word. It assumes only
 // uppercase letters as input and uses a slice instead of maps for performance
 // reasons.
 func freqmap(fm frequencyMap, str ...string) {
@@ -87,6 +89,8 @@ func freqmap(fm frequencyMap, str ...string) {
 
 // mapContains returns true if a string is fully contained in a frequency map.
 func mapContains(a frequencyMap, str ...string) bool {
+	// We use a statically initialized overlay slice to avoid having to copy
+	// the original frequencyMap. 0xff in a position means "not yet used".
 	overlay := frequencyMap{
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
 		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
@@ -121,7 +125,8 @@ func mapEquals(a, b frequencyMap) bool {
 }
 
 // anagrams starts the recursive anagramming function for each word in the list
-// of candidate words.
+// of candidate words. It will spawn a number of parallel goroutines to process
+// each "root" (defined in parallelism.)
 func anagrams(phrase string, cand []string, altwords alternativeWords, parallelism int) []string {
 	ret := []string{}
 
@@ -139,17 +144,18 @@ func anagrams(phrase string, cand []string, altwords alternativeWords, paralleli
 
 	pending := 0
 	for ix, w := range cand {
+		// Ignore removed candidate words.
 		if w == "" {
 			continue
 		}
 		// Immediately print candidates that match the len of phrase and remove them
 		// from the slice, since they're anagrams by definition.
 		if len(w) == plen {
-			r := multiReplace([]string{w}, altwords)
+			r := altCartesianProduct([]string{w}, altwords)
 			ret = append(ret, r...)
 			cand[ix] = ""
 		}
-		//fmt.Printf("Anagrams trying with base=%q\n", cand[ix])
+		// Send the request to the pool of workers.
 		req := workerRequest{
 			pmap:     pmap,
 			plen:     plen,
@@ -172,16 +178,20 @@ func anagrams(phrase string, cand []string, altwords alternativeWords, paralleli
 	return ret
 }
 
+// anaworker continuously read a channel with the request of the work to be
+// done and spawns anawords to recursively deal with it. The result from
+// anawords is returned in the response channel.
 func anaworker(req chan workerRequest, resp chan []string) {
 	for {
 		c := <-req
-		//fmt.Println("Worker about to call anawords with", c.cand)
 		ret := anawords(c.pmap, c.plen, c.cand, c.base, c.altwords)
-		//fmt.Println("Worker got response from anawords: ", ret)
 		resp <- ret
 	}
 }
 
+// readResponses attempts reads all responses from the channel.  It returns the
+// responses as a single slice of strings and the number of responses read. The
+// function is non-blocking and will return when no response is available.
 func readResponses(respchan chan []string) ([]string, int) {
 	ret := []string{}
 	nread := 0
@@ -194,17 +204,16 @@ func readResponses(respchan chan []string) ([]string, int) {
 				ret = append(ret, r...)
 			}
 		default:
-			//fmt.Printf("Returning with nread=%d\n", nread)
 			return ret, nread
 		}
 	}
 }
 
+// readNResponses attempts to read exactly N responses from the channel. If will
+// block and wait on the channel if necessary.
 func readNResponses(respchan chan []string, pending int) []string {
-	ret := make([]string, 0, anagramCapacity)
-	//fmt.Println("read N with pending", pending)
+	ret := []string{}
 	for ; pending > 0; pending-- {
-		//fmt.Println("Read N reading channel for pending", pending)
 		r := <-respchan
 		if len(r) > 0 {
 			ret = append(ret, r...)
@@ -214,18 +223,17 @@ func readNResponses(respchan chan []string, pending int) []string {
 }
 
 // anawords recursively generates a list of anagrams for the specified list of
-// candidates, starting with 'base' as the root.
+// candidates, starting with 'base' as the root. This function may take an
+// impossibly long time if the number of candidate words is too large.
 func anawords(pmap frequencyMap, plen int, cand []string, base []string, altwords alternativeWords) []string {
 	blen := 0
 	for _, w := range base {
 		blen += len(w)
 	}
 	//fmt.Printf("DEBUG: base=%q, blen=%d, plen=%d\n", base, blen, plen)
-	//fmt.Printf("DEBUG: cand=%q\n", cand)
 
 	// If current base is longer than phrase, skip.
 	if blen > plen {
-		//fmt.Println("DEBUG: Base too long:", base)
 		return []string{}
 	}
 
@@ -235,7 +243,6 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string, altword
 	// base is still a candidate word of phrase.
 	if blen < plen {
 		if !mapContains(pmap, base...) {
-			//fmt.Printf("DEBUG: Map does not contain base: %q\n", base)
 			return []string{}
 		}
 		// Recurse with each word on the list of candidates and our base.
@@ -249,60 +256,56 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string, altword
 			// the total length of the phrase, we can return immediately, since
 			// all further executions will be invalid.
 			if blen+len(cword) > plen {
-				//fmt.Printf("DEBUG: skipping since base is too large: blen=%d, cwordlen=%d, cword=%q\n", blen, len(cword), cword)
 				break
 			}
 			newbase := append(base, cword)
 
 			r := anawords(pmap, plen, cand[ix+1:], newbase, altwords)
-
 			if len(r) > 0 {
-				//fmt.Printf("DEBUG: Appending %q to the list of anagrams\n", r)
 				ret = append(ret, r...)
 			}
 		}
-		//fmt.Printf("DEBUG: Returning %q now\n", ret)
 		return ret
 	}
 
-	// The length of the base string is the same as the phrase. If we have
-	// an exact match then we have an anagram.
+	// At this point, the length of the base string is the same as the phrase.
+	// This means we *may* have a valid anagram and need to use mapEquals to
+	// determine that.  We also use altCartesianProduct to generate all
+	// possible transpositions of every candidate word by any available
+	// alternatives.
 	bmap := make(frequencyMap, frequencyMapLen)
 	freqmap(bmap, base...)
 	if !mapEquals(pmap, bmap) {
-		//fmt.Println("DEBUG: no exact match for", base)
 		return []string{}
 	}
-	ret = multiReplace(base, altwords)
-	//fmt.Printf("Returning exact match: %q\n", ret)
+	ret = altCartesianProduct(base, altwords)
 	return ret
 }
 
-func multiReplace(base []string, altwords alternativeWords) []string {
-	// Lines is a slice of slices. First level is a line. Second
-	// level is a slice of words.
+// altCartesianProduct reads a slice of slice of strings, where each element in
+// the inner slice are words in an expression. It then creates a new line with
+// each of the words with present in 'altwords' replaced, returning the new,
+// complete slice.
+func altCartesianProduct(base []string, altwords alternativeWords) []string {
+	// Lines is a slice of slices. First level is a line. Second level is a
+	// slice of words.
 	lines := make([][]string, 1, 10)
 	lines[0] = base
 
 	// Iterate over each word on base>
 	for wordpos := range base {
-		//fmt.Printf("wordpos = %d\n", wordpos)
 		// Iterate over each line.
 		numlines := len(lines)
 		for ixline := 0; ixline < numlines; ixline++ {
 			line := lines[ixline]
-			//fmt.Printf("Line is %q\n", line)
 			word := line[wordpos]
-			//fmt.Printf("Word is %q\n", word)
 			aws := altwords[sortString(word)]
-			//fmt.Printf("Alternative words: %q\n", aws)
-			// Iterate over each alternate word and append variations to
-			// the original slice at the 'idx' position. The cycle then
-			// repeats for the new slice, starting at the next word.
+			// Iterate over each alternate word and append variations to the
+			// original slice at the 'idx' position. The cycle then repeats for
+			// the new slice, starting at the next word.
 			for _, aw := range aws {
-				//fmt.Printf("Alternate word is: %q\n", aw)
+				// Ignore the word itself.
 				if aw == word {
-					//fmt.Printf("Ignoring...\n")
 					continue
 				}
 				newline := make([]string, len(line))
@@ -310,7 +313,6 @@ func multiReplace(base []string, altwords alternativeWords) []string {
 					newline[i] = line[i]
 				}
 				newline[wordpos] = aw
-				//fmt.Printf("Adding %q to lines\n", newline)
 				lines = append(lines, newline)
 			}
 		}
@@ -321,6 +323,5 @@ func multiReplace(base []string, altwords alternativeWords) []string {
 	for _, line := range lines {
 		ret = append(ret, strings.Join(line, " "))
 	}
-	//fmt.Printf("Replaced to %q\n", ret)
 	return ret
 }
