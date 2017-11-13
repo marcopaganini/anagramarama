@@ -30,18 +30,20 @@ func sanitize(s string) (string, error) {
 
 func main() {
 	var (
-		optDict       string
-		optCPUProfile string
-		optSilent     bool
 		optCandidates bool
+		optCPUProfile string
+		optDict       string
+		optParallel   int
+		optSilent     bool
 	)
 
 	log.SetFlags(0)
 
-	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
-	flag.StringVar(&optCPUProfile, "cpuprofile", "", "write cpu profile to file")
-	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
 	flag.BoolVar(&optCandidates, "candidates", false, "just show candidate words (don't anagram)")
+	flag.StringVar(&optCPUProfile, "cpuprofile", "", "write cpu profile to file")
+	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
+	flag.IntVar(&optParallel, "parallelism", 1, "number of goroutine threads")
+	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
 	flag.Parse()
 
 	if len(flag.Args()) < 1 {
@@ -84,7 +86,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	an := anagrams(phrase, cand, altwords)
+	an := anagrams(phrase, cand, altwords, optParallel)
 
 	if !optSilent {
 		for _, w := range an {

@@ -8,20 +8,29 @@
 package main
 
 import (
-	//"fmt"
 	"sort"
 	"strings"
 )
 
 const (
-	frequencyMapLen = 26    // Uppercase letters.
-	anagramCapacity = 30000 // Initial capacity of the slice to hold anagrams.
+	frequencyMapLen = 26 // Uppercase letters.
+	anagramCapacity = 16 // Initial capacity of the slice to hold anagrams.
 )
 
 type (
 	frequencyMap     []byte
 	alternativeWords map[string][]string
 	byLen            []string
+
+	// workerRequest contains all the necessary information to start
+	// a tree of anagrams (initial call to anawords).
+	workerRequest struct {
+		pmap     frequencyMap
+		plen     int
+		cand     []string
+		base     []string
+		altwords alternativeWords
+	}
 )
 
 // candidates reads a slice of words and produces a list of candidate and
@@ -113,14 +122,22 @@ func mapEquals(a, b frequencyMap) bool {
 
 // anagrams starts the recursive anagramming function for each word in the list
 // of candidate words.
-func anagrams(phrase string, cand []string, altwords alternativeWords) []string {
-	ret := make([]string, 0, anagramCapacity)
+func anagrams(phrase string, cand []string, altwords alternativeWords, parallelism int) []string {
+	ret := []string{}
 
 	// Pre-calculate frequency map and length of phrase, since it does not change.
 	pmap := make(frequencyMap, frequencyMapLen)
 	freqmap(pmap, phrase)
 	plen := len(phrase)
 
+	// Create request & response channels and start workers
+	reqchan := make(chan workerRequest, parallelism)
+	respchan := make(chan []string, parallelism)
+	for i := 0; i < parallelism; i++ {
+		go anaworker(reqchan, respchan)
+	}
+
+	pending := 0
 	for ix, w := range cand {
 		if w == "" {
 			continue
@@ -133,7 +150,62 @@ func anagrams(phrase string, cand []string, altwords alternativeWords) []string 
 			cand[ix] = ""
 		}
 		//fmt.Printf("Anagrams trying with base=%q\n", cand[ix])
-		r := anawords(pmap, plen, cand[ix+1:], []string{cand[ix]}, altwords)
+		req := workerRequest{
+			pmap:     pmap,
+			plen:     plen,
+			cand:     cand[ix+1:],
+			base:     []string{cand[ix]},
+			altwords: altwords}
+		reqchan <- req
+		pending++
+
+		r, nread := readResponses(respchan)
+		if nread > 0 {
+			ret = append(ret, r...)
+			pending -= nread
+		}
+	}
+	// Keep reading requests until no more pending requests exist.
+	r := readNResponses(respchan, pending)
+	ret = append(ret, r...)
+
+	return ret
+}
+
+func anaworker(req chan workerRequest, resp chan []string) {
+	for {
+		c := <-req
+		//fmt.Println("Worker about to call anawords with", c.cand)
+		ret := anawords(c.pmap, c.plen, c.cand, c.base, c.altwords)
+		//fmt.Println("Worker got response from anawords: ", ret)
+		resp <- ret
+	}
+}
+
+func readResponses(respchan chan []string) ([]string, int) {
+	ret := []string{}
+	nread := 0
+
+	for {
+		select {
+		case r := <-respchan:
+			nread++
+			if len(r) > 0 {
+				ret = append(ret, r...)
+			}
+		default:
+			//fmt.Printf("Returning with nread=%d\n", nread)
+			return ret, nread
+		}
+	}
+}
+
+func readNResponses(respchan chan []string, pending int) []string {
+	ret := make([]string, 0, anagramCapacity)
+	//fmt.Println("read N with pending", pending)
+	for ; pending > 0; pending-- {
+		//fmt.Println("Read N reading channel for pending", pending)
+		r := <-respchan
 		if len(r) > 0 {
 			ret = append(ret, r...)
 		}
