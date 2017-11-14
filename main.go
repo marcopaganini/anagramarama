@@ -38,6 +38,20 @@ func sortWords(lines []string) {
 	}
 }
 
+// readDict reads the dictionary in memory (one word per line) and
+// returns a slice of strings with the words.
+func readDict(dfile string) ([]string, error) {
+	// read entire file in memory.
+	buf, err := ioutil.ReadFile(dfile)
+	if err != nil {
+		return nil, err
+	}
+
+	// Split input in newlines and generate the list of candidate words.
+	words := strings.Split(strings.TrimRight(string(buf), "\n"), "\n")
+	return words, nil
+}
+
 func main() {
 	var (
 		optCandidates bool
@@ -82,19 +96,17 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	// Read entire file in memory.
-	buf, err := ioutil.ReadFile(optDict)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	phrase, err := sanitize(flag.Args()[0])
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-	// Split input in newlines and generate the list of candidate words.
-	words := strings.Split(strings.TrimRight(string(buf), "\n"), "\n")
+	words, err := readDict(optDict)
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	// Generate list of candidate and alternate words.
 	cand, altwords := candidates(words, phrase)
 
 	if optCandidates {
