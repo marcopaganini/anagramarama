@@ -15,6 +15,7 @@ import (
 	"os"
 	"regexp"
 	"runtime/pprof"
+	"sort"
 	"strings"
 )
 
@@ -28,6 +29,15 @@ func sanitize(s string) (string, error) {
 	return re.ReplaceAllString(strings.ToUpper(s), ""), nil
 }
 
+// sortWords reads a slice of strings and sorts each line by word.
+func sortWords(lines []string) {
+	for idx, line := range lines {
+		w := strings.Split(line, " ")
+		sort.Strings(w)
+		lines[idx] = strings.Join(w, " ")
+	}
+}
+
 func main() {
 	var (
 		optCandidates bool
@@ -35,6 +45,8 @@ func main() {
 		optDict       string
 		optParallel   int
 		optSilent     bool
+		optSortLines  bool
+		optSortWords  bool
 	)
 
 	log.SetFlags(0)
@@ -44,6 +56,8 @@ func main() {
 	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
 	flag.IntVar(&optParallel, "parallelism", 16, "number of goroutine threads")
 	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
+	flag.BoolVar(&optSortLines, "sortlines", false, "(also) sort the output by lines")
+	flag.BoolVar(&optSortWords, "sortwords", true, "(also) sort the output by words")
 
 	// Custom usage.
 	flag.Usage = func() {
@@ -90,10 +104,16 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Anagram.
+	// Anagram & Print sorted by word (and optionally, by line.)
 	an := anagrams(phrase, cand, altwords, optParallel)
 
 	if !optSilent {
+		if optSortWords {
+			sortWords(an)
+		}
+		if optSortLines {
+			sort.Strings(an)
+		}
 		for _, w := range an {
 			fmt.Println(w)
 		}
