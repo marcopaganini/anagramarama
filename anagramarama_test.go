@@ -9,27 +9,36 @@ import (
 
 func TestAnagram(t *testing.T) {
 	casetests := []struct {
-		phrase    string
-		dictFile  string
-		wantFile  string
-		parallel  int
-		wantError bool
+		phrase     string
+		dictFile   string
+		wantFile   string
+		parallel   int
+		minWordLen int
+		maxWordLen int
+		wantError  bool
 	}{
 		// One thread.
 		{
-			phrase:    "marco paganini ab",
-			dictFile:  "testdata/words.txt",
-			wantFile:  "testdata/results.txt",
-			parallel:  1,
-			wantError: false,
+			phrase:   "marco paganini ab",
+			dictFile: "testdata/words.txt",
+			wantFile: "testdata/results.txt",
+			parallel: 1,
 		},
 		// Multiple threads.
 		{
-			phrase:    "marco paganini ab",
-			dictFile:  "testdata/words.txt",
-			wantFile:  "testdata/results.txt",
-			parallel:  16,
-			wantError: false,
+			phrase:   "marco paganini ab",
+			dictFile: "testdata/words.txt",
+			wantFile: "testdata/results.txt",
+			parallel: 16,
+		},
+		// Mininum & Maximum word length set.
+		{
+			phrase:     "marco paganini ab",
+			dictFile:   "testdata/words.txt",
+			wantFile:   "testdata/results-min4-max5.txt",
+			minWordLen: 4,
+			maxWordLen: 5,
+			parallel:   16,
 		},
 		// Invalid dictionary name (error)
 		{
@@ -60,7 +69,7 @@ func TestAnagram(t *testing.T) {
 			}
 
 			// Generate list of candidate and alternate words.
-			cand, altwords := candidates(words, phrase)
+			cand, altwords := candidates(words, phrase, tt.minWordLen, tt.maxWordLen)
 			got := anagrams(phrase, cand, altwords, tt.parallel)
 
 			lenGot := len(got)

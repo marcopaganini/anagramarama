@@ -57,6 +57,8 @@ func main() {
 		optCandidates bool
 		optCPUProfile string
 		optDict       string
+		optMinWordLen int
+		optMaxWordLen int
 		optParallel   int
 		optSilent     bool
 		optSortLines  bool
@@ -68,6 +70,8 @@ func main() {
 	flag.BoolVar(&optCandidates, "candidates", false, "just show candidate words (don't anagram)")
 	flag.StringVar(&optCPUProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
+	flag.IntVar(&optMinWordLen, "minlen", 0, "minimum word length (0=no minimum)")
+	flag.IntVar(&optMaxWordLen, "maxlen", 0, "maximum word length (0=no maximum)")
 	flag.IntVar(&optParallel, "parallelism", 16, "number of goroutine threads")
 	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
 	flag.BoolVar(&optSortLines, "sortlines", false, "(also) sort the output by lines")
@@ -107,7 +111,7 @@ func main() {
 	}
 
 	// Generate list of candidate and alternate words.
-	cand, altwords := candidates(words, phrase)
+	cand, altwords := candidates(words, phrase, optMinWordLen, optMaxWordLen)
 
 	if optCandidates {
 		for _, w := range cand {

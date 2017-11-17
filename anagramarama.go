@@ -39,7 +39,7 @@ type (
 // alternative words.  A candidate word is a word fully contained in the
 // original phrase. Alternative words contain a slice of anagrams from the
 // candidate word, keyed by the sorted characters of the candidate word.
-func candidates(words []string, phrase string) ([]string, alternativeWords) {
+func candidates(words []string, phrase string, minWordLen, maxWordLen int) ([]string, alternativeWords) {
 	cand := []string{}
 	altwords := alternativeWords{}
 
@@ -51,6 +51,13 @@ wordLoop:
 	for _, w := range words {
 		// Next word immediately if word is larger than phrase.
 		if len(w) > plen {
+			continue
+		}
+		// Reject word if outside desired word length limits
+		if minWordLen != 0 && len(w) < minWordLen {
+			continue
+		}
+		if maxWordLen != 0 && len(w) > maxWordLen {
 			continue
 		}
 		// Ignore anything not in [A-Z].
