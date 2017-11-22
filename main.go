@@ -52,6 +52,21 @@ func readDict(dfile string) ([]string, error) {
 	return words, nil
 }
 
+// printCandidates prints the candidate (and alternative) words.
+func printCandidates(cand []string, altwords alternativeWords) {
+	for _, w := range cand {
+		fmt.Printf("%s", w)
+		// altwords normally contains the word itself. Don't print
+		// cases where len(altwords) == 1 to simplify visualization.
+		if a, ok := altwords[w]; ok {
+			if len(a) > 1 {
+				fmt.Printf(" (alternatives: %s)", strings.Join(a, ", "))
+			}
+		}
+		fmt.Println()
+	}
+}
+
 func main() {
 	var (
 		optCandidates bool
@@ -114,9 +129,7 @@ func main() {
 	cand, altwords := candidates(words, phrase, optMinWordLen, optMaxWordLen)
 
 	if optCandidates {
-		for _, w := range cand {
-			fmt.Println(w)
-		}
+		printCandidates(cand, altwords)
 		os.Exit(0)
 	}
 
