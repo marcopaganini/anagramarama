@@ -32,6 +32,7 @@ type (
 		cand     []string
 		base     []string
 		altwords alternativeWords
+		maxwords int
 	}
 )
 
@@ -134,7 +135,7 @@ func mapEquals(a, b frequencyMap) bool {
 // anagrams starts the recursive anagramming function for each word in the list
 // of candidate words. It will spawn a number of parallel goroutines to process
 // each "root" (defined in parallelism.)
-func anagrams(phrase string, cand []string, altwords alternativeWords, parallelism int) []string {
+func anagrams(phrase string, cand []string, altwords alternativeWords, parallelism, maxwords int) []string {
 	ret := []string{}
 
 	// Pre-calculate frequency map and length of phrase, since it does not change.
@@ -168,7 +169,8 @@ func anagrams(phrase string, cand []string, altwords alternativeWords, paralleli
 			plen:     plen,
 			cand:     cand[ix+1:],
 			base:     []string{cand[ix]},
-			altwords: altwords}
+			altwords: altwords,
+			maxwords: maxwords}
 		reqchan <- req
 		pending++
 
@@ -191,7 +193,7 @@ func anagrams(phrase string, cand []string, altwords alternativeWords, paralleli
 func anaworker(req chan workerRequest, resp chan []string) {
 	for {
 		c := <-req
-		ret := anawords(c.pmap, c.plen, c.cand, c.base, c.altwords)
+		ret := anawords(c.pmap, c.plen, c.cand, c.base, c.altwords, c.maxwords)
 		resp <- ret
 	}
 }
@@ -232,15 +234,20 @@ func readNResponses(respchan chan []string, pending int) []string {
 // anawords recursively generates a list of anagrams for the specified list of
 // candidates, starting with 'base' as the root. This function may take an
 // impossibly long time if the number of candidate words is too large.
-func anawords(pmap frequencyMap, plen int, cand []string, base []string, altwords alternativeWords) []string {
+func anawords(pmap frequencyMap, plen int, cand []string, base []string, altwords alternativeWords, maxwords int) []string {
 	blen := 0
 	for _, w := range base {
 		blen += len(w)
 	}
 	//fmt.Printf("DEBUG: base=%q, blen=%d, plen=%d\n", base, blen, plen)
 
-	// If current base is longer than phrase, skip.
+	// If length current base is longer than phrase, skip.
 	if blen > plen {
+		return []string{}
+	}
+
+	// Return if maximum number of words is exceeded (recursion depth.)
+	if len(base) > maxwords {
 		return []string{}
 	}
 
@@ -267,7 +274,7 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string, altword
 			}
 			newbase := append(base, cword)
 
-			r := anawords(pmap, plen, cand[ix+1:], newbase, altwords)
+			r := anawords(pmap, plen, cand[ix+1:], newbase, altwords, maxwords)
 			if len(r) > 0 {
 				ret = append(ret, r...)
 			}

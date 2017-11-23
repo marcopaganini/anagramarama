@@ -15,6 +15,7 @@ func TestAnagram(t *testing.T) {
 		parallel   int
 		minWordLen int
 		maxWordLen int
+		maxWordNum int
 		wantError  bool
 	}{
 		// One thread.
@@ -40,6 +41,14 @@ func TestAnagram(t *testing.T) {
 			maxWordLen: 5,
 			parallel:   16,
 		},
+		// Limit number of words to 3.
+		{
+			phrase:     "lorem ipsum dolor sit",
+			dictFile:   "testdata/words.txt",
+			wantFile:   "testdata/results-3words.txt",
+			parallel:   16,
+			maxWordNum: 3,
+		},
 		// Invalid dictionary name (error)
 		{
 			phrase:    "marco paganini ab",
@@ -62,6 +71,11 @@ func TestAnagram(t *testing.T) {
 			t.Fatalf("error reading results file: %v", err)
 		}
 
+		// Default maxWordNum if zero
+		if tt.maxWordNum == 0 {
+			tt.maxWordNum = 16
+		}
+
 		words, err := readDict(tt.dictFile)
 		if !tt.wantError {
 			if err != nil {
@@ -70,7 +84,7 @@ func TestAnagram(t *testing.T) {
 
 			// Generate list of candidate and alternate words.
 			cand, altwords := candidates(words, phrase, tt.minWordLen, tt.maxWordLen)
-			got := anagrams(phrase, cand, altwords, tt.parallel)
+			got := anagrams(phrase, cand, altwords, tt.parallel, tt.maxWordNum)
 
 			lenGot := len(got)
 			lenWant := len(want)
