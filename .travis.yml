@@ -12,5 +12,7 @@ install:
 
 script:
   - ./travis-ci/codecheck.sh
-  - go test -v ./...
-  - go test -cpu=2 -race -v ./...
+  - go test -cpu=2 -race -v -coverprofile=coverage.txt -covermode=atomic ./...
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
