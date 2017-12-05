@@ -41,7 +41,7 @@ type (
 // original phrase. Alternative words contain a slice of anagrams from the
 // candidate word, keyed by the sorted characters of the candidate word.
 func candidates(words []string, phrase string, minWordLen, maxWordLen int) ([]string, alternativeWords) {
-	cand := []string{}
+	var cand []string
 	altwords := alternativeWords{}
 
 	pmap := make(frequencyMap, frequencyMapLen)
@@ -202,7 +202,7 @@ func anaworker(req chan workerRequest, resp chan []string) {
 // responses as a single slice of strings and the number of responses read. The
 // function is non-blocking and will return when no response is available.
 func readResponses(respchan chan []string) ([]string, int) {
-	ret := []string{}
+	var ret []string
 	nread := 0
 
 	for {
@@ -221,7 +221,7 @@ func readResponses(respchan chan []string) ([]string, int) {
 // readNResponses attempts to read exactly N responses from the channel. If will
 // block and wait on the channel if necessary.
 func readNResponses(respchan chan []string, pending int) []string {
-	ret := []string{}
+	var ret []string
 	for ; pending > 0; pending-- {
 		r := <-respchan
 		if len(r) > 0 {
@@ -243,21 +243,21 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string, altword
 
 	// If length current base is longer than phrase, skip.
 	if blen > plen {
-		return []string{}
+		return nil
 	}
 
 	// Return if maximum number of words is exceeded (recursion depth.)
 	if len(base) > maxwords {
-		return []string{}
+		return nil
 	}
 
-	ret := []string{}
+	var ret []string
 
 	// Our base phrase is still shorter than the phrase. We continue if our
 	// base is still a candidate word of phrase.
 	if blen < plen {
 		if !mapContains(pmap, base...) {
-			return []string{}
+			return nil
 		}
 		// Recurse with each word on the list of candidates and our base.
 		for ix, cword := range cand {
@@ -275,7 +275,7 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string, altword
 			newbase := append(base, cword)
 
 			r := anawords(pmap, plen, cand[ix+1:], newbase, altwords, maxwords)
-			if len(r) > 0 {
+			if r != nil {
 				ret = append(ret, r...)
 			}
 		}
@@ -290,7 +290,7 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string, altword
 	bmap := make(frequencyMap, frequencyMapLen)
 	freqmap(bmap, base...)
 	if !mapEquals(pmap, bmap) {
-		return []string{}
+		return nil
 	}
 	ret = altCartesianProduct(base, altwords)
 	return ret
@@ -333,7 +333,7 @@ func altCartesianProduct(base []string, altwords alternativeWords) []string {
 	}
 
 	// Convert [][]string into a []string with each word separated by spaces.
-	ret := []string{}
+	var ret []string
 	for _, line := range lines {
 		ret = append(ret, strings.Join(line, " "))
 	}
