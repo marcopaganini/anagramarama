@@ -66,7 +66,6 @@ func main() {
 		optDict       string
 		optMinWordLen int
 		optMaxWordLen int
-		optMaxWordNum int
 		optParallel   int
 		optSilent     bool
 		optSortLines  bool
@@ -80,7 +79,6 @@ func main() {
 	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
 	flag.IntVar(&optMinWordLen, "minlen", 0, "minimum word length (0=no minimum)")
 	flag.IntVar(&optMaxWordLen, "maxlen", 0, "maximum word length (0=no maximum)")
-	flag.IntVar(&optMaxWordNum, "maxwords", 16, "maximum number of words")
 	flag.IntVar(&optParallel, "parallelism", 16, "number of goroutine threads")
 	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
 	flag.BoolVar(&optSortLines, "sortlines", false, "(also) sort the output by lines")
@@ -128,7 +126,7 @@ func main() {
 	}
 
 	// Anagram & Print sorted by word (and optionally, by line.)
-	an := anagrams(phrase, cand, optParallel, optMaxWordNum)
+	an := anagrams(phrase, cand, optParallel)
 
 	if !optSilent {
 		if optSortWords {
