@@ -83,8 +83,8 @@ func TestAnagram(t *testing.T) {
 			}
 
 			// Generate list of candidate and alternate words.
-			cand, altwords := candidates(words, phrase, tt.minWordLen, tt.maxWordLen)
-			got := anagrams(phrase, cand, altwords, tt.parallel, tt.maxWordNum)
+			cand := candidates(words, phrase, tt.minWordLen, tt.maxWordLen)
+			got := anagrams(phrase, cand, tt.parallel, tt.maxWordNum)
 
 			lenGot := len(got)
 			lenWant := len(want)

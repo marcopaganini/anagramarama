@@ -21,9 +21,6 @@ type (
 	// characters are supported.
 	frequencyMap []byte
 
-	// alternativeWords holds the list of alternatives for one candidate word.
-	alternativeWords map[string][]string
-
 	// workerRequest contains all the necessary information to start
 	// a tree of anagrams (initial call to anawords).
 	workerRequest struct {
@@ -31,7 +28,6 @@ type (
 		plen     int
 		cand     []string
 		base     []string
-		altwords alternativeWords
 		maxwords int
 	}
 )
@@ -40,9 +36,8 @@ type (
 // alternative words.  A candidate word is a word fully contained in the
 // original phrase. Alternative words contain a slice of anagrams from the
 // candidate word, keyed by the sorted characters of the candidate word.
-func candidates(words []string, phrase string, minWordLen, maxWordLen int) ([]string, alternativeWords) {
+func candidates(words []string, phrase string, minWordLen, maxWordLen int) []string {
 	var cand []string
-	altwords := alternativeWords{}
 
 	pmap := make(frequencyMap, frequencyMapLen)
 	freqmap(pmap, phrase)
@@ -62,25 +57,19 @@ wordLoop:
 			continue
 		}
 		// Ignore anything not in [A-Z].
-		w := strings.ToUpper(w)
+		w = strings.ToUpper(w)
 		for _, r := range w {
 			if r < 'A' || r > 'Z' {
 				continue wordLoop
 			}
 		}
 		if mapContains(pmap, w) {
-			sortword := sortString(w)
-			if _, ok := altwords[sortword]; ok {
-				altwords[sortword] = append(altwords[sortword], w)
-			} else {
-				altwords[sortword] = []string{w}
-				cand = append(cand, w)
-			}
+			cand = append(cand, w)
 		}
 	}
 
 	sort.Sort(byLen(cand))
-	return cand, altwords
+	return cand
 }
 
 // freqmap creates a frequency map of every letter in the word. It assumes only
@@ -135,7 +124,7 @@ func mapEquals(a, b frequencyMap) bool {
 // anagrams starts the recursive anagramming function for each word in the list
 // of candidate words. It will spawn a number of parallel goroutines to process
 // each "root" (defined in parallelism.)
-func anagrams(phrase string, cand []string, altwords alternativeWords, parallelism, maxwords int) []string {
+func anagrams(phrase string, cand []string, parallelism, maxwords int) []string {
 	ret := []string{}
 
 	// Pre-calculate frequency map and length of phrase, since it does not change.
@@ -159,8 +148,7 @@ func anagrams(phrase string, cand []string, altwords alternativeWords, paralleli
 		// Immediately print candidates that match the len of phrase and remove them
 		// from the slice, since they're anagrams by definition.
 		if len(w) == plen {
-			r := altCartesianProduct([]string{w}, altwords)
-			ret = append(ret, r...)
+			ret = append(ret, w)
 			cand[ix] = ""
 		}
 		// Send the request to the pool of workers.
@@ -169,7 +157,6 @@ func anagrams(phrase string, cand []string, altwords alternativeWords, paralleli
 			plen:     plen,
 			cand:     cand[ix+1:],
 			base:     []string{cand[ix]},
-			altwords: altwords,
 			maxwords: maxwords}
 		reqchan <- req
 		pending++
@@ -193,7 +180,7 @@ func anagrams(phrase string, cand []string, altwords alternativeWords, paralleli
 func anaworker(req chan workerRequest, resp chan []string) {
 	for {
 		c := <-req
-		ret := anawords(c.pmap, c.plen, c.cand, c.base, c.altwords, c.maxwords)
+		ret := anawords(c.pmap, c.plen, c.cand, c.base, c.maxwords)
 		resp <- ret
 	}
 }
@@ -234,7 +221,7 @@ func readNResponses(respchan chan []string, pending int) []string {
 // anawords recursively generates a list of anagrams for the specified list of
 // candidates, starting with 'base' as the root. This function may take an
 // impossibly long time if the number of candidate words is too large.
-func anawords(pmap frequencyMap, plen int, cand []string, base []string, altwords alternativeWords, maxwords int) []string {
+func anawords(pmap frequencyMap, plen int, cand []string, base []string, maxwords int) []string {
 	blen := 0
 	for _, w := range base {
 		blen += len(w)
@@ -274,7 +261,7 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string, altword
 			}
 			newbase := append(base, cword)
 
-			r := anawords(pmap, plen, cand[ix+1:], newbase, altwords, maxwords)
+			r := anawords(pmap, plen, cand[ix+1:], newbase, maxwords)
 			if r != nil {
 				ret = append(ret, r...)
 			}
@@ -292,50 +279,5 @@ func anawords(pmap frequencyMap, plen int, cand []string, base []string, altword
 	if !mapEquals(pmap, bmap) {
 		return nil
 	}
-	ret = altCartesianProduct(base, altwords)
-	return ret
-}
-
-// altCartesianProduct reads a slice of slice of strings, where each element in
-// the inner slice are words in an expression. It then creates a new line with
-// each of the words with present in 'altwords' replaced, returning the new,
-// complete slice.
-func altCartesianProduct(base []string, altwords alternativeWords) []string {
-	// Lines is a slice of slices. First level is a line. Second level is a
-	// slice of words.
-	lines := make([][]string, 1, 10)
-	lines[0] = base
-
-	// Iterate over each word on base>
-	for wordpos := range base {
-		// Iterate over each line.
-		numlines := len(lines)
-		for ixline := 0; ixline < numlines; ixline++ {
-			line := lines[ixline]
-			word := line[wordpos]
-			aws := altwords[sortString(word)]
-			// Iterate over each alternate word and append variations to the
-			// original slice at the 'idx' position. The cycle then repeats for
-			// the new slice, starting at the next word.
-			for _, aw := range aws {
-				// Ignore the word itself.
-				if aw == word {
-					continue
-				}
-				newline := make([]string, len(line))
-				for i := range line {
-					newline[i] = line[i]
-				}
-				newline[wordpos] = aw
-				lines = append(lines, newline)
-			}
-		}
-	}
-
-	// Convert [][]string into a []string with each word separated by spaces.
-	var ret []string
-	for _, line := range lines {
-		ret = append(ret, strings.Join(line, " "))
-	}
-	return ret
+	return []string{strings.Join(base, " ")}
 }

@@ -8,18 +8,9 @@
 
 package main
 
-import (
-	"sort"
-)
-
-type (
-	// byLen defines a type to sort a slice of strings by
-	// the length of each element.
-	byLen []string
-
-	// sortRunes defines a type to short the runes of a string.
-	sortRunes []rune
-)
+// byLen defines a type to sort a slice of strings by
+// the length of each element.
+type byLen []string
 
 func (x byLen) Len() int {
 	return len(x)
@@ -33,22 +24,4 @@ func (x byLen) Less(i, j int) bool {
 	leni := len(x[i])
 	lenj := len(x[j])
 	return leni < lenj
-}
-
-func (s sortRunes) Less(i, j int) bool {
-	return s[i] < s[j]
-}
-
-func (s sortRunes) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-func (s sortRunes) Len() int {
-	return len(s)
-}
-
-func sortString(s string) string {
-	r := []rune(s)
-	sort.Sort(sortRunes(r))
-	return string(r)
 }

@@ -53,17 +53,9 @@ func readDict(dfile string) ([]string, error) {
 }
 
 // printCandidates prints the candidate (and alternative) words.
-func printCandidates(cand []string, altwords alternativeWords) {
+func printCandidates(cand []string) {
 	for _, w := range cand {
-		fmt.Printf("%s", w)
-		// altwords normally contains the word itself. Don't print
-		// cases where len(altwords) == 1 to simplify visualization.
-		if a, ok := altwords[w]; ok {
-			if len(a) > 1 {
-				fmt.Printf(" (alternatives: %s)", strings.Join(a, ", "))
-			}
-		}
-		fmt.Println()
+		fmt.Println(w)
 	}
 }
 
@@ -128,15 +120,15 @@ func main() {
 	}
 
 	// Generate list of candidate and alternate words.
-	cand, altwords := candidates(words, phrase, optMinWordLen, optMaxWordLen)
+	cand := candidates(words, phrase, optMinWordLen, optMaxWordLen)
 
 	if optCandidates {
-		printCandidates(cand, altwords)
+		printCandidates(cand)
 		os.Exit(0)
 	}
 
 	// Anagram & Print sorted by word (and optionally, by line.)
-	an := anagrams(phrase, cand, altwords, optParallel, optMaxWordNum)
+	an := anagrams(phrase, cand, optParallel, optMaxWordNum)
 
 	if !optSilent {
 		if optSortWords {
