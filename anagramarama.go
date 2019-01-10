@@ -19,27 +19,14 @@ const (
 type (
 	// frequencyMap holds a letter to frequency map. Only 'frequencyMapLen'
 	// characters are supported.
-	frequencyMap []byte
-
-	// workerRequest contains all the necessary information to start
-	// a tree of anagrams (initial call to anawords).
-	workerRequest struct {
-		pmap frequencyMap
-		plen int
-		cand []string
-		base string
-	}
+	frequencyMap [frequencyMapLen]int
 )
 
-// candidates reads a slice of words and produces a list of candidate and
-// alternative words.  A candidate word is a word fully contained in the
-// original phrase. Alternative words contain a slice of anagrams from the
-// candidate word, keyed by the sorted characters of the candidate word.
+// candidates reads a slice of words and produces a list of candidate words
+// (i.e, words that could be anagrammed to our phrase).
 func candidates(words []string, phrase string, minWordLen, maxWordLen int) []string {
 	var cand []string
-
-	pmap := make(frequencyMap, frequencyMapLen)
-	freqmap(pmap, phrase)
+	pmap := freqmap(&phrase)
 	plen := len(phrase)
 
 wordLoop:
@@ -62,7 +49,7 @@ wordLoop:
 				continue wordLoop
 			}
 		}
-		if mapContains(pmap, w) {
+		if mapContains(&pmap, &w) {
 			cand = append(cand, w)
 		}
 	}
@@ -74,209 +61,137 @@ wordLoop:
 // freqmap creates a frequency map of every letter in the word. It assumes only
 // uppercase letters as input and uses a slice instead of maps for performance
 // reasons.
-func freqmap(fm frequencyMap, s string) {
-	for _, r := range s {
-		if r == ' ' {
-			continue
-		}
-		idx := int(r) - int('A')
-		fm[idx]++
+func freqmap(word *string) frequencyMap {
+	var m frequencyMap
+
+	for ix := 0; ix < len(*word); ix++ {
+		r := (*word)[ix]
+		idx := r - 'A'
+		m[idx]++
 	}
+	return m
 }
 
-// mapContains returns true if a string is fully contained in a frequency map.
-func mapContains(a frequencyMap, s string) bool {
-	// We use a statically initialized overlay slice to avoid having to copy
-	// the original frequencyMap. 0xff in a position means "not yet used".
-	overlay := frequencyMap{
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-		0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff}
+// freqmapSlice creates a frequency map of all elements in a slice.
+func freqmapSlice(words []string) frequencyMap {
+	var m frequencyMap
 
-	ret := true
-	for _, r := range s {
-		if r == ' ' {
-			continue
+	for i := 0; i < len(words); i++ {
+		w := words[i]
+		for j := 0; j < len(w); j++ {
+			idx := w[j] - 'A'
+			m[idx]++
 		}
-		idx := int(r) - int('A')
-		if overlay[idx] == 0xff {
-			overlay[idx] = a[idx]
-		}
-		if overlay[idx] == 0 {
-			ret = false
-			break
-		}
-		overlay[idx]--
 	}
-	return ret
+	return m
 }
 
-// mapEquals returns true if two frequency maps are identical.
-func mapEquals(a, b frequencyMap) bool {
-	for ix := 0; ix < frequencyMapLen; ix++ {
-		if a[ix] != b[ix] {
+// mapLen returns the length of the map, in characters.
+func mapLen(m frequencyMap) int {
+	var size int
+	for i := 0; i < frequencyMapLen; i++ {
+		size += m[i]
+	}
+	return size
+}
+
+// mapContains returns true if map a contains the string.
+func mapContains(a *frequencyMap, word *string) bool {
+	var smap frequencyMap
+
+	for i := 0; i < len(*word); i++ {
+		idx := (*word)[i] - 'A'
+		smap[idx]++
+	}
+	for i := 0; i < frequencyMapLen; i++ {
+		if smap[i] > (*a)[i] {
 			return false
 		}
 	}
 	return true
 }
 
-// numLetters returns the number of letters in a string (excluding space)
-func numLetters(s string) int {
-	var size int
-	for _, r := range s {
-		if r == ' ' {
+// mapEquals returns true if two frequency maps are identical.
+func mapEquals(a, b frequencyMap) bool {
+	for i := 0; i < frequencyMapLen; i++ {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// mapSubtract returns a map representing map a - map b.
+func mapSubtract(m frequencyMap, words []string) frequencyMap {
+	total := frequencyMap{}
+
+	for i := 0; i < len(words); i++ {
+		for j := 0; j < len(words[i]); j++ {
+			idx := words[i][j] - 'A'
+			total[idx]++
+		}
+	}
+	for i := 0; i < frequencyMapLen; i++ {
+		total[i] = m[i] - total[i]
+	}
+	return total
+}
+
+// mapIsEmpty returns true if the map is empty, false otherwise.
+func mapIsEmpty(m frequencyMap) bool {
+	for i := 0; i < frequencyMapLen; i++ {
+		if m[i] > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// anagrams recursively generates a list of anagrams for the specified list of
+// candidates, starting with 'base' as the root. If 'depth' is specified,
+// recursion will stop at this level. This essentially limits the number of
+// words in an anagram. This function may take an impossibly long time if the
+// number of candidate words is too large.
+func anagrams(pmap frequencyMap, cand []string, base []string, numwords, maxwords int) []string {
+	var ret []string
+
+	// maximum recursion depth (number of words)
+	if numwords > maxwords {
+		return nil
+	}
+	numwords++
+
+	//fmt.Printf("Got base=%s\n", base)
+	leftmap := mapSubtract(pmap, base)
+
+	// Perfect match.
+	if mapIsEmpty(leftmap) {
+		//fmt.Printf("New phrase map is empty. Returning base [%s]\n", base)
+		return append(ret, strings.Join(base, " "))
+	}
+
+	charsleft := mapLen(leftmap)
+
+	for ix := 0; ix < len(cand); ix++ {
+		cword := cand[ix]
+		// The input list of words is sorted by word length.  If we the length
+		// of the current base + the current word exceeds the total length of
+		// the phrase, no more anagrams exist from this point on.
+		if len(cword) > charsleft {
+			break
+		}
+
+		// Only recurse if cword fits the remaining characters.
+		if !mapContains(&leftmap, &cword) {
 			continue
 		}
-		size++
-	}
-	return size
-}
 
-// anagrams starts the recursive anagramming function for each word in the list
-// of candidate words. It will spawn a number of parallel goroutines to process
-// each "root" (defined in parallelism.)
-func anagrams(phrase string, cand []string, parallelism int) []string {
-	ret := []string{}
-
-	// Pre-calculate frequency map and length of phrase, since it does not change.
-	pmap := make(frequencyMap, frequencyMapLen)
-	freqmap(pmap, phrase)
-	plen := numLetters(phrase)
-
-	// Create request & response channels and start workers
-	reqchan := make(chan workerRequest, parallelism)
-	respchan := make(chan []string, parallelism)
-	for i := 0; i < parallelism; i++ {
-		go anaworker(reqchan, respchan)
-	}
-
-	pending := 0
-	for ix := range cand {
-		// Send the request to the pool of workers.
-		req := workerRequest{
-			pmap: pmap,
-			plen: plen,
-			cand: cand[ix+1:],
-			base: cand[ix]}
-		reqchan <- req
-		pending++
-
-		r, nread := readResponses(respchan)
-		if nread > 0 {
-			ret = append(ret, r...)
-			pending -= nread
-		}
-	}
-	// Keep reading requests until no more pending requests exist.
-	r := readNResponses(respchan, pending)
-	ret = append(ret, r...)
-
-	return ret
-}
-
-// anaworker continuously read a channel with the request of the work to be
-// done and spawns anawords to recursively deal with it. The result from
-// anawords is returned in the response channel.
-func anaworker(req chan workerRequest, resp chan []string) {
-	for {
-		c := <-req
-		ret := anawords(c.pmap, c.plen, c.cand, c.base)
-		resp <- ret
-	}
-}
-
-// readResponses attempts reads all responses from the channel.  It returns the
-// responses as a single slice of strings and the number of responses read. The
-// function is non-blocking and will return when no response is available.
-func readResponses(respchan chan []string) ([]string, int) {
-	var ret []string
-	nread := 0
-
-	for {
-		select {
-		case r := <-respchan:
-			nread++
-			if len(r) > 0 {
-				ret = append(ret, r...)
-			}
-		default:
-			return ret, nread
-		}
-	}
-}
-
-// readNResponses attempts to read exactly N responses from the channel. If will
-// block and wait on the channel if necessary.
-func readNResponses(respchan chan []string, pending int) []string {
-	var ret []string
-	for ; pending > 0; pending-- {
-		r := <-respchan
-		if len(r) > 0 {
+		// New base is our current base + new word.
+		newbase := append(base, cword)
+		r := anagrams(pmap, cand[ix+1:], newbase, numwords, maxwords)
+		if r != nil {
 			ret = append(ret, r...)
 		}
 	}
 	return ret
-}
-
-// anawords recursively generates a list of anagrams for the specified list of
-// candidates, starting with 'base' as the root. This function may take an
-// impossibly long time if the number of candidate words is too large.
-func anawords(pmap frequencyMap, plen int, cand []string, base string) []string {
-	blen := numLetters(base)
-	//fmt.Printf("DEBUG: base=%q, blen=%d, plen=%d\n", base, blen, plen)
-	//fmt.Printf("Candidates: ")
-	//for _, v := range cand {
-	//	fmt.Printf("[%s] ", v)
-	//}
-	//fmt.Println()
-
-	// If length current base is longer than phrase, skip.
-	if blen > plen {
-		return nil
-	}
-
-	var ret []string
-
-	// Recurse if our base phrase is still shorter than the phrase.
-	if blen < plen {
-		// Base is not an anagram of phrase anymore.
-		if !mapContains(pmap, base) {
-			return nil
-		}
-		// Recurse with each word on the list of candidates and our base.
-		for ix, cword := range cand {
-			// Ignore removed (blank) words.
-			if cword == "" {
-				continue
-			}
-			// Optimization: the input list of words is sorted by word length.
-			// If we the length of the current base + the current word exceeds
-			// the total length of the phrase, we can return immediately, since
-			// all further executions will be invalid.
-			if blen+numLetters(cword) > plen {
-				break
-			}
-			//fmt.Printf("base=[%s]\n", base)
-			//fmt.Printf("cword=[%s]\n", cword)
-			newbase := base + " " + cword
-			r := anawords(pmap, plen, cand[ix+1:], newbase)
-			if r != nil {
-				ret = append(ret, r...)
-			}
-		}
-		return ret
-	}
-
-	// At this point, the length of the base string is the same as the phrase.
-	// This means we *may* have a valid anagram and need to use mapEquals to
-	// determine that.
-	bmap := make(frequencyMap, frequencyMapLen)
-	freqmap(bmap, base)
-	if !mapEquals(pmap, bmap) {
-		return nil
-	}
-	//fmt.Printf("Returning base [%s]\n", base)
-	return []string{base}
 }

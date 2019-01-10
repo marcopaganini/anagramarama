@@ -12,7 +12,6 @@ func TestAnagram(t *testing.T) {
 		phrase     string
 		dictFile   string
 		wantFile   string
-		parallel   int
 		minWordLen int
 		maxWordLen int
 		maxWordNum int
@@ -20,17 +19,17 @@ func TestAnagram(t *testing.T) {
 	}{
 		// One thread.
 		{
-			phrase:   "marco paganini ab",
-			dictFile: "testdata/words.txt",
-			wantFile: "testdata/results.txt",
-			parallel: 1,
+			phrase:     "marco paganini ab",
+			dictFile:   "testdata/words.txt",
+			wantFile:   "testdata/results.txt",
+			maxWordNum: 16,
 		},
 		// Multiple threads.
 		{
-			phrase:   "marco paganini ab",
-			dictFile: "testdata/words.txt",
-			wantFile: "testdata/results.txt",
-			parallel: 16,
+			phrase:     "marco paganini ab",
+			dictFile:   "testdata/words.txt",
+			wantFile:   "testdata/results.txt",
+			maxWordNum: 16,
 		},
 		// Mininum & Maximum word length set.
 		{
@@ -39,23 +38,22 @@ func TestAnagram(t *testing.T) {
 			wantFile:   "testdata/results-min4-max5.txt",
 			minWordLen: 4,
 			maxWordLen: 5,
-			parallel:   16,
+			maxWordNum: 16,
 		},
 		// Limit number of words to 3.
 		{
 			phrase:     "lorem ipsum dolor sit",
 			dictFile:   "testdata/words.txt",
 			wantFile:   "testdata/results-3words.txt",
-			parallel:   16,
 			maxWordNum: 3,
 		},
 		// Invalid dictionary name (error)
 		{
-			phrase:    "marco paganini ab",
-			dictFile:  "INVALIDFILE",
-			wantFile:  "testdata/results.txt",
-			parallel:  1,
-			wantError: true,
+			phrase:     "marco paganini ab",
+			dictFile:   "INVALIDFILE",
+			wantFile:   "testdata/results.txt",
+			maxWordNum: 16,
+			wantError:  true,
 		},
 	}
 
@@ -84,7 +82,7 @@ func TestAnagram(t *testing.T) {
 
 			// Generate list of candidate and alternate words.
 			cand := candidates(words, phrase, tt.minWordLen, tt.maxWordLen)
-			got := anagrams(phrase, cand, tt.parallel, tt.maxWordNum)
+			got := anagrams(freqmap(&phrase), cand, []string{}, 0, tt.maxWordNum)
 
 			lenGot := len(got)
 			lenWant := len(want)

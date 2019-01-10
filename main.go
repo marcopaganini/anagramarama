@@ -19,6 +19,18 @@ import (
 	"strings"
 )
 
+var (
+	optCandidates bool
+	optCPUProfile string
+	optDict       string
+	optMinWordLen int
+	optMaxWordLen int
+	optMaxWordNum int
+	optSilent     bool
+	optSortLines  bool
+	optSortWords  bool
+)
+
 // Sanitize converts the input string to uppercase and removes all characters
 // that don't match [A-Z].
 func sanitize(s string) (string, error) {
@@ -60,18 +72,6 @@ func printCandidates(cand []string) {
 }
 
 func main() {
-	var (
-		optCandidates bool
-		optCPUProfile string
-		optDict       string
-		optMinWordLen int
-		optMaxWordLen int
-		optParallel   int
-		optSilent     bool
-		optSortLines  bool
-		optSortWords  bool
-	)
-
 	log.SetFlags(0)
 
 	flag.BoolVar(&optCandidates, "candidates", false, "just show candidate words (don't anagram)")
@@ -79,7 +79,7 @@ func main() {
 	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
 	flag.IntVar(&optMinWordLen, "minlen", 0, "minimum word length (0=no minimum)")
 	flag.IntVar(&optMaxWordLen, "maxlen", 0, "maximum word length (0=no maximum)")
-	flag.IntVar(&optParallel, "parallelism", 16, "number of goroutine threads")
+	flag.IntVar(&optMaxWordNum, "maxwords", 16, "maximum number of words (0=no maximum)")
 	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
 	flag.BoolVar(&optSortLines, "sortlines", false, "(also) sort the output by lines")
 	flag.BoolVar(&optSortWords, "sortwords", true, "(also) sort the output by words")
@@ -126,7 +126,8 @@ func main() {
 	}
 
 	// Anagram & Print sorted by word (and optionally, by line.)
-	an := anagrams(phrase, cand, optParallel)
+	var an []string
+	an = anagrams(freqmap(&phrase), cand, an, 0, optMaxWordNum)
 
 	if !optSilent {
 		if optSortWords {
