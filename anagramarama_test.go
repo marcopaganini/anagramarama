@@ -22,6 +22,8 @@ func TestAnagram(t *testing.T) {
 			phrase:     "marco paganini ab",
 			dictFile:   "testdata/words.txt",
 			wantFile:   "testdata/results.txt",
+			minWordLen: 1,
+			maxWordLen: 64,
 			maxWordNum: 16,
 		},
 		// Multiple threads.
@@ -29,6 +31,8 @@ func TestAnagram(t *testing.T) {
 			phrase:     "marco paganini ab",
 			dictFile:   "testdata/words.txt",
 			wantFile:   "testdata/results.txt",
+			minWordLen: 1,
+			maxWordLen: 64,
 			maxWordNum: 16,
 		},
 		// Mininum & Maximum word length set.
@@ -45,6 +49,8 @@ func TestAnagram(t *testing.T) {
 			phrase:     "lorem ipsum dolor sit",
 			dictFile:   "testdata/words.txt",
 			wantFile:   "testdata/results-3words.txt",
+			minWordLen: 1,
+			maxWordLen: 64,
 			maxWordNum: 3,
 		},
 		// Invalid dictionary name (error)
@@ -52,6 +58,8 @@ func TestAnagram(t *testing.T) {
 			phrase:     "marco paganini ab",
 			dictFile:   "INVALIDFILE",
 			wantFile:   "testdata/results.txt",
+			minWordLen: 1,
+			maxWordLen: 64,
 			maxWordNum: 16,
 			wantError:  true,
 		},
@@ -69,11 +77,6 @@ func TestAnagram(t *testing.T) {
 			t.Fatalf("error reading results file: %v", err)
 		}
 
-		// Default maxWordNum if zero
-		if tt.maxWordNum == 0 {
-			tt.maxWordNum = 16
-		}
-
 		words, err := readDict(tt.dictFile)
 		if !tt.wantError {
 			if err != nil {
@@ -87,7 +90,7 @@ func TestAnagram(t *testing.T) {
 			lenGot := len(got)
 			lenWant := len(want)
 			if lenGot != lenWant {
-				t.Fatalf("anagram lists have different lengths. Got %d lines, want %d lines.", lenGot, lenWant)
+				t.Fatalf("anagram lists have different lengths. Phrase %q, Got %d lines, want %d lines.", tt.phrase, lenGot, lenWant)
 			}
 
 			// Sort output by words and then by line.
@@ -96,7 +99,7 @@ func TestAnagram(t *testing.T) {
 
 			for ix := 0; ix < lenGot; ix++ {
 				if got[ix] != want[ix] {
-					t.Fatalf("diff: line %d, Got %q, want %q.", ix, got[ix], want[ix])
+					t.Fatalf("diff: phrase %q, line %d, Got %q, want %q.", tt.phrase, ix, got[ix], want[ix])
 				}
 			}
 			continue

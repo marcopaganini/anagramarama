@@ -50,6 +50,19 @@ func sortWords(lines []string) {
 	}
 }
 
+// printAnagrams prints all anagrams using the command-line sorting options.
+func printAnagrams(an []string, sortlines, sortwords bool) {
+	if optSortWords {
+		sortWords(an)
+	}
+	if optSortLines {
+		sort.Strings(an)
+	}
+	for _, w := range an {
+		fmt.Println(w)
+	}
+}
+
 // readDict reads the dictionary in memory (one word per line) and
 // returns a slice of strings with the words.
 func readDict(dfile string) ([]string, error) {
@@ -77,8 +90,8 @@ func main() {
 	flag.BoolVar(&optCandidates, "candidates", false, "just show candidate words (don't anagram)")
 	flag.StringVar(&optCPUProfile, "cpuprofile", "", "write cpu profile to file")
 	flag.StringVar(&optDict, "dict", "words.txt", "dictionary file")
-	flag.IntVar(&optMinWordLen, "minlen", 0, "minimum word length (0=no minimum)")
-	flag.IntVar(&optMaxWordLen, "maxlen", 0, "maximum word length (0=no maximum)")
+	flag.IntVar(&optMinWordLen, "minlen", 1, "minimum word length")
+	flag.IntVar(&optMaxWordLen, "maxlen", 64, "maximum word length")
 	flag.IntVar(&optMaxWordNum, "maxwords", 16, "maximum number of words (0=no maximum)")
 	flag.BoolVar(&optSilent, "silent", false, "don't print results.")
 	flag.BoolVar(&optSortLines, "sortlines", false, "(also) sort the output by lines")
@@ -109,12 +122,12 @@ func main() {
 
 	phrase, err := sanitize(flag.Args()[0])
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
 	words, err := readDict(optDict)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal(err)
 	}
 
 	// Generate list of candidate and alternate words.
@@ -130,14 +143,6 @@ func main() {
 	an = anagrams(freqmap(&phrase), cand, an, 0, optMaxWordNum)
 
 	if !optSilent {
-		if optSortWords {
-			sortWords(an)
-		}
-		if optSortLines {
-			sort.Strings(an)
-		}
-		for _, w := range an {
-			fmt.Println(w)
-		}
+		printAnagrams(an, optSortLines, optSortWords)
 	}
 }

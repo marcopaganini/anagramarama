@@ -31,15 +31,14 @@ func candidates(words []string, phrase string, minWordLen, maxWordLen int) []str
 
 wordLoop:
 	for _, w := range words {
+		wordlen := len(w)
+
 		// Next word immediately if word is larger than phrase.
-		if len(w) > plen {
+		if wordlen > plen {
 			continue
 		}
 		// Reject word if outside desired word length limits
-		if minWordLen != 0 && len(w) < minWordLen {
-			continue
-		}
-		if maxWordLen != 0 && len(w) > maxWordLen {
+		if wordlen < minWordLen || wordlen > maxWordLen {
 			continue
 		}
 		// Ignore anything not in [A-Z].
@@ -72,20 +71,6 @@ func freqmap(word *string) frequencyMap {
 	return m
 }
 
-// freqmapSlice creates a frequency map of all elements in a slice.
-func freqmapSlice(words []string) frequencyMap {
-	var m frequencyMap
-
-	for i := 0; i < len(words); i++ {
-		w := words[i]
-		for j := 0; j < len(w); j++ {
-			idx := w[j] - 'A'
-			m[idx]++
-		}
-	}
-	return m
-}
-
 // mapLen returns the length of the map, in characters.
 func mapLen(m frequencyMap) int {
 	var size int
@@ -105,16 +90,6 @@ func mapContains(a *frequencyMap, word *string) bool {
 	}
 	for i := 0; i < frequencyMapLen; i++ {
 		if smap[i] > (*a)[i] {
-			return false
-		}
-	}
-	return true
-}
-
-// mapEquals returns true if two frequency maps are identical.
-func mapEquals(a, b frequencyMap) bool {
-	for i := 0; i < frequencyMapLen; i++ {
-		if a[i] != b[i] {
 			return false
 		}
 	}
@@ -166,7 +141,6 @@ func anagrams(pmap frequencyMap, cand []string, base []string, numwords, maxword
 
 	// Perfect match.
 	if mapIsEmpty(leftmap) {
-		//fmt.Printf("New phrase map is empty. Returning base [%s]\n", base)
 		return append(ret, strings.Join(base, " "))
 	}
 
