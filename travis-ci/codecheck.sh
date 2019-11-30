@@ -5,7 +5,7 @@
 # - go vet
 #
 # Needs:
-# golint: go get -u github.com/golang/lint/golint
+# golint: go get -u golang.org/x/lint/golint
 
 TMPFILE=$(mktemp)
 trap "rm -f $TMPFILE" EXIT
