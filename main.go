@@ -8,6 +8,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -79,8 +80,11 @@ func readDict(dfile string) ([]string, error) {
 
 // printCandidates prints the candidate (and alternative) words.
 func printCandidates(cand []string) {
+	out := bufio.NewWriterSize(os.Stdout, 16*1024)
+	defer out.Flush()
+
 	for _, w := range cand {
-		fmt.Println(w)
+		out.WriteString(w)
 	}
 }
 

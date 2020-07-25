@@ -87,9 +87,7 @@ func mapContains(a *frequencyMap, word *string) bool {
 	for i := 0; i < len(*word); i++ {
 		idx := (*word)[i] - 'A'
 		smap[idx]++
-	}
-	for i := 0; i < frequencyMapLen; i++ {
-		if smap[i] > (*a)[i] {
+		if smap[idx] > (*a)[idx] {
 			return false
 		}
 	}
