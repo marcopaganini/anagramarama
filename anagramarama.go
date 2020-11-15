@@ -80,11 +80,24 @@ func mapLen(m frequencyMap) int {
 	return size
 }
 
+// mapDefinitelyDoesNotContain returns true if the map definitely does not
+// contain a given word. This is a faster alternative to mapContains that can
+// only be trusted on negative results.
+func mapDefinitelyDoesNotContain(a *frequencyMap, word *string) bool {
+	for i := int(0); i < len(*word); i++ {
+		idx := (*word)[i] - 'A'
+		if (*a)[idx] == 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // mapContains returns true if map a contains the string.
 func mapContains(a *frequencyMap, word *string) bool {
 	var smap frequencyMap
 
-	for i := 0; i < len(*word); i++ {
+	for i := int(0); i < len(*word); i++ {
 		idx := (*word)[i] - 'A'
 		smap[idx]++
 		if smap[idx] > (*a)[idx] {
@@ -134,7 +147,6 @@ func anagrams(pmap frequencyMap, cand []string, base []string, numwords, maxword
 	}
 	numwords++
 
-	//fmt.Printf("Got base=%s\n", base)
 	leftmap := mapSubtract(pmap, base)
 
 	// Perfect match.
@@ -146,14 +158,17 @@ func anagrams(pmap frequencyMap, cand []string, base []string, numwords, maxword
 
 	for ix := 0; ix < len(cand); ix++ {
 		cword := cand[ix]
-		// The input list of words is sorted by word length.  If we the length
-		// of the current base + the current word exceeds the total length of
-		// the phrase, no more anagrams exist from this point on.
+		// The input list of words is sorted by word length.  If the length of
+		// the current base + the current word exceeds the total length of the
+		// phrase, no more anagrams exist from this point on.
 		if len(cword) > charsleft {
 			break
 		}
 
 		// Only recurse if cword fits the remaining characters.
+		if mapDefinitelyDoesNotContain(&leftmap, &cword) {
+			continue
+		}
 		if !mapContains(&leftmap, &cword) {
 			continue
 		}
