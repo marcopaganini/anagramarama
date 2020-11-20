@@ -19,7 +19,7 @@ const (
 type (
 	// frequencyMap holds a letter to frequency map. Only 'frequencyMapLen'
 	// characters are supported.
-	frequencyMap [frequencyMapLen]int
+	frequencyMap [frequencyMapLen]byte
 )
 
 // candidates reads a slice of words and produces a list of candidate words
@@ -73,11 +73,11 @@ func freqmap(word *string) frequencyMap {
 
 // mapLen returns the length of the map, in characters.
 func mapLen(m frequencyMap) int {
-	var size int
+	var size byte
 	for i := 0; i < frequencyMapLen; i++ {
 		size += m[i]
 	}
-	return size
+	return int(size)
 }
 
 // mapDefinitelyDoesNotContain returns true if the map definitely does not
@@ -91,13 +91,14 @@ func mapDefinitelyDoesNotContain(a *frequencyMap, word *string) bool {
 	if (*a)[idx] == 0 {
 		return true
 	}
-	if len(*word) > 1 {
+	wordlen := len(*word)
+	if wordlen > 1 {
 		idx = (*word)[1] - 'A'
 		if (*a)[idx] == 0 {
 			return true
 		}
 	}
-	if len(*word) > 2 {
+	if wordlen > 2 {
 		idx = (*word)[2] - 'A'
 		if (*a)[idx] == 0 {
 			return true
