@@ -84,12 +84,26 @@ func mapLen(m frequencyMap) int {
 // contain a given word. This is a faster alternative to mapContains that can
 // only be trusted on negative results.
 func mapDefinitelyDoesNotContain(a *frequencyMap, word *string) bool {
-	for i := int(0); i < len(*word); i++ {
-		idx := (*word)[i] - 'A'
+	// Note: A loop makes this nicer, but also makes it slower.
+	// We only test the first three first characters for matches in the map.
+	// Anything above three and we start seeing longer times.
+	idx := (*word)[0] - 'A'
+	if (*a)[idx] == 0 {
+		return true
+	}
+	if len(*word) > 1 {
+		idx = (*word)[1] - 'A'
 		if (*a)[idx] == 0 {
 			return true
 		}
 	}
+	if len(*word) > 2 {
+		idx = (*word)[2] - 'A'
+		if (*a)[idx] == 0 {
+			return true
+		}
+	}
+
 	return false
 }
 
