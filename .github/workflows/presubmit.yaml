@@ -19,5 +19,6 @@ jobs:
           go get -u golang.org/x/lint/golint
 
       - name: Validate code
+        run: |
           ./ci/codecheck.sh
           go test -cpu=2 -race -v ./...
