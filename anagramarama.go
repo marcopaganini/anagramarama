@@ -122,7 +122,8 @@ func mapContains(a *frequencyMap, word *string) bool {
 	return true
 }
 
-// mapSubtract returns a map representing map a - map b.
+// mapSubtract returns a map representing map a - map b and
+// the number of characters represented in the resulting map.
 func mapSubtract(m frequencyMap, words []string) frequencyMap {
 	total := frequencyMap{}
 
@@ -133,7 +134,11 @@ func mapSubtract(m frequencyMap, words []string) frequencyMap {
 		}
 	}
 	for i := 0; i < frequencyMapLen; i++ {
-		total[i] = m[i] - total[i]
+		if total[i] >= m[i] {
+			total[i] = 0
+		} else {
+			total[i] = m[i] - total[i]
+		}
 	}
 	return total
 }
