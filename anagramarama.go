@@ -71,15 +71,6 @@ func freqmap(word *string) frequencyMap {
 	return m
 }
 
-// mapLen returns the length of the map, in characters.
-func mapLen(m frequencyMap) int {
-	var size byte
-	for i := 0; i < frequencyMapLen; i++ {
-		size += m[i]
-	}
-	return int(size)
-}
-
 // mapDefinitelyDoesNotContain returns true if the map definitely does not
 // contain a given word. This is a faster alternative to mapContains that can
 // only be trusted on negative results.
@@ -124,8 +115,9 @@ func mapContains(a *frequencyMap, word *string) bool {
 
 // mapSubtract returns a map representing map a - map b and
 // the number of characters represented in the resulting map.
-func mapSubtract(m frequencyMap, words []string) frequencyMap {
+func mapSubtract(m frequencyMap, words []string) (frequencyMap, int) {
 	total := frequencyMap{}
+	numchars := 0
 
 	for i := 0; i < len(words); i++ {
 		for j := 0; j < len(words[i]); j++ {
@@ -134,23 +126,14 @@ func mapSubtract(m frequencyMap, words []string) frequencyMap {
 		}
 	}
 	for i := 0; i < frequencyMapLen; i++ {
+		numchars += int(m[i] - total[i])
 		if total[i] >= m[i] {
 			total[i] = 0
 		} else {
 			total[i] = m[i] - total[i]
 		}
 	}
-	return total
-}
-
-// mapIsEmpty returns true if the map is empty, false otherwise.
-func mapIsEmpty(m frequencyMap) bool {
-	for i := 0; i < frequencyMapLen; i++ {
-		if m[i] > 0 {
-			return false
-		}
-	}
-	return true
+	return total, numchars
 }
 
 // anagrams recursively generates a list of anagrams for the specified list of
@@ -167,14 +150,12 @@ func anagrams(pmap frequencyMap, cand []string, base []string, numwords, maxword
 	}
 	numwords++
 
-	leftmap := mapSubtract(pmap, base)
+	leftmap, charsleft := mapSubtract(pmap, base)
 
 	// Perfect match.
-	if mapIsEmpty(leftmap) {
+	if charsleft == 0 {
 		return append(ret, strings.Join(base, " "))
 	}
-
-	charsleft := mapLen(leftmap)
 
 	for ix := 0; ix < len(cand); ix++ {
 		cword := cand[ix]
