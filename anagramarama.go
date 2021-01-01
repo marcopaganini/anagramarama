@@ -48,7 +48,7 @@ wordLoop:
 				continue wordLoop
 			}
 		}
-		if mapContains(&pmap, &w) {
+		if mapContains(pmap, &w) {
 			cand = append(cand, w)
 		}
 	}
@@ -100,15 +100,13 @@ func mapDefinitelyDoesNotContain(a *frequencyMap, word *string) bool {
 }
 
 // mapContains returns true if map a contains the string.
-func mapContains(a *frequencyMap, word *string) bool {
-	var smap frequencyMap
-
+func mapContains(a frequencyMap, word *string) bool {
 	for i := int(0); i < len(*word); i++ {
 		idx := (*word)[i] - 'A'
-		smap[idx]++
-		if smap[idx] > (*a)[idx] {
+		if a[idx] == 0 {
 			return false
 		}
+		a[idx]--
 	}
 	return true
 }
@@ -170,7 +168,7 @@ func anagrams(pmap frequencyMap, cand []string, base []string, numwords, maxword
 		if mapDefinitelyDoesNotContain(&leftmap, &cword) {
 			continue
 		}
-		if !mapContains(&leftmap, &cword) {
+		if !mapContains(leftmap, &cword) {
 			continue
 		}
 
